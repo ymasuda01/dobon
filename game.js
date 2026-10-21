@@ -118,6 +118,7 @@ function triggerFlash() {
   if (f) { f.classList.add('active'); setTimeout(() => f.classList.remove('active'), 80); }
 }
 
+// 画面中央からパーンと広がり、重力で落ちてくるConfetti
 let confettiAnimationId = null;
 function startConfetti() {
   const canvas = document.getElementById('confetti-canvas');
@@ -126,21 +127,37 @@ function startConfetti() {
   canvas.style.display = 'block';
   const ctx = canvas.getContext('2d'), pieces = [];
   const colors = ['#f5cd79', '#e74c3c', '#2ecc71', '#3498db', '#9b59b6', '#ffffff'];
-  for (let i = 0; i < 120; i++) {
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height * 0.44;
+
+  for (let i = 0; i < 140; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 12 + 6;
     pieces.push({
-      x: Math.random() * canvas.width, y: Math.random() * -canvas.height,
-      size: Math.random() * 9 + 5, color: colors[Math.floor(Math.random() * colors.length)],
-      speed: Math.random() * 5 + 3, angle: Math.random() * 360, rotation: Math.random() * 10 - 5
+      x: centerX, y: centerY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 4, // 上方向へ打ち上げ
+      size: Math.random() * 9 + 5,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * 360,
+      rotSpeed: Math.random() * 10 - 5,
+      gravity: 0.28,
+      drag: 0.96
     });
   }
   function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     pieces.forEach(p => {
-      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate((p.angle * Math.PI) / 180);
-      ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+      p.vx *= p.drag; p.vy *= p.drag;
+      p.vy += p.gravity;
+      p.x += p.vx; p.y += p.vy;
+      p.rotation += p.rotSpeed;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate((p.rotation * Math.PI) / 180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
       ctx.restore();
-      p.y += p.speed; p.angle += p.rotation;
-      if (p.y > canvas.height) p.y = -20;
     });
     confettiAnimationId = requestAnimationFrame(draw);
   }
@@ -155,6 +172,27 @@ function stopConfetti() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     canvas.style.display = 'none';
   }
+}
+
+// 勝敗テロップ演出（WINNER!で花火Confetti / LOSE...で激震）
+function showOutcomeBanner(isWin) {
+  const b = document.getElementById('round-outcome-banner');
+  if (!b) return;
+  if (isWin) {
+    b.innerText = 'WINNER!';
+    b.className = 'winner show';
+    startConfetti();
+  } else {
+    b.innerText = 'LOSE...';
+    b.className = 'lose show';
+    document.body.classList.add('shake-screen');
+    setTimeout(() => document.body.classList.remove('shake-screen'), 500);
+  }
+}
+
+function hideOutcomeBanner() {
+  const b = document.getElementById('round-outcome-banner');
+  if (b) { b.className = ''; b.innerText = ''; }
 }
 
 function createDeck52() {
@@ -266,6 +304,7 @@ function startGame(isResume = false) {
 
 function startRound() {
   isGameOver = false; stopTimer(); clearDobonStandby(); stopConfetti();
+  hideOutcomeBanner(); // ← これを追加
   createDeck52(); discardHistory = []; drawTwoStack = 0; designatedSuit = null;
   direction = -1; selectedIndices = []; cancelNakiMode(); pendingLastCheck = false;
   consecutivePassCount = 0;
@@ -1061,7 +1100,7 @@ function finalizeNormalDobon(winner, loser, actionDiscard) {
   roundMultiplier = 1; nextRoundStarter = winner.id;
   updateUI();
 
-  if (winner.id === 0) startConfetti();
+  showOutcomeBanner(winner.id === 0);
 
   showResultModal(`${winner.name} DOBON WIN!`, `<b>Winner: ${winner.name} (+${points}pt)</b><br>Target: ${loser.name} (-${points}pt)`);
   pendingDobonData = null;
@@ -1079,7 +1118,7 @@ function executeDobonGaeshiWin(winner, loser) {
   roundMultiplier = 1; nextRoundStarter = winner.id;
   updateUI();
 
-  if (winner.id === 0) startConfetti();
+  showOutcomeBanner(winner.id === 0);
 
   showResultModal(`DOBON-GAESHI! (カウンター成立)`, `<b>Counter Winner: ${winner.name} (+${points}pt)</b><br>Dobon Discarder: ${loser.name} (-${points}pt)`);
   pendingDobonData = null;
@@ -1115,7 +1154,7 @@ function endRoundNormalWin(winner) {
   roundMultiplier = 1; nextRoundStarter = winner.id;
   updateUI();
 
-  if (winner.id === 0) startConfetti();
+  showOutcomeBanner(winner.id === 0);
 
   showResultModal(`${winner.name} WIN!`, `${detailHtml}<b>Winner: +${totalWin}pt</b>`);
 }
@@ -1136,6 +1175,7 @@ function commitChombo(offender, reason) {
   recordRoundHistory('CHOMBO', deltas);
 
   offender.bannedFromWin = true;
+  if (offender.id === 0) showOutcomeBanner(false);
   if (players.every(p => p.bannedFromWin)) players.forEach(p => p.bannedFromWin = false);
   roundMultiplier *= 2; nextRoundStarter = offender.id;
   updateUI();
@@ -1158,7 +1198,7 @@ function checkTenho() {
       p.score += winPts; deltas[p.id] = winPts;
       recordRoundHistory('TENHO', deltas);
       updateUI();
-      if (p.id === 0) startConfetti();
+      showOutcomeBanner(p.id === 0);
       showResultModal('TENHO DOBON!', `<b>${p.name}: +${winPts}pt</b>`);
       return;
     }

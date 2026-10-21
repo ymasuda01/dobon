@@ -13,7 +13,7 @@
 <style>
   :root {
     --gold: #f5cd79;
-    --gold-glow: rgba(245, 205, 121, 0.7);
+    --gold-glow: rgba(245, 205, 121, 0.85);
     --table-green: #157347;
     --card-red: #c0392b;
     --card-black: #1a1a1a;
@@ -33,24 +33,23 @@
   /* カジノ背景（被写界深度ぼかし） */
   #casino-bg {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: radial-gradient(circle at 50% 30%, rgba(20, 10, 5, 0.25) 0%, rgba(5, 5, 5, 0.85) 100%),
+    background: radial-gradient(circle at 50% 30%, rgba(20, 10, 5, 0.2) 0%, rgba(5, 5, 5, 0.85) 100%),
                 url('background.png') right center / cover no-repeat;
     filter: blur(4px) brightness(0.65);
     transform: scale(1.05); z-index: 1; pointer-events: none;
   }
 
-  /* ヘッダー（ボタン英語固定） */
+  /* 上部ヘッダー */
   header {
     background: rgba(12, 10, 8, 0.92); backdrop-filter: blur(10px);
     border-bottom: 2px solid rgba(245, 205, 121, 0.35);
-    padding: 5px 12px;
+    padding: 5px 10px;
     display: flex; justify-content: space-between; align-items: center;
     font-size: 11px; z-index: 60; flex-shrink: 0; gap: 4px;
   }
   .header-btn {
     background: rgba(45, 35, 25, 0.9); color: var(--gold); border: 1.5px solid var(--gold);
     border-radius: 5px; padding: 4px 8px; font-size: 10px; font-weight: 900; cursor: pointer;
-    letter-spacing: 0.5px;
   }
   .mult-tag {
     background: #e74c3c; color: #fff; padding: 1px 5px; border-radius: 8px; font-weight: bold; font-size: 9px;
@@ -72,36 +71,59 @@
     transform: rotateX(50deg);
     position: relative;
     display: flex; flex-direction: column; justify-content: space-between;
-    padding: 10px 16px;
+    padding: 8px 12px;
   }
 
-  /* 相手CPUの扇状配置（円弧状） */
+  /* 相手CPUの扇状配置 */
   #cpu-arc-container {
-    position: absolute; top: 15px; left: 0; width: 100%; height: 95px;
+    position: absolute; top: 10px; left: 0; width: 100%; height: 100px;
     display: flex; justify-content: space-around; align-items: flex-start;
     z-index: 20;
   }
   .cpu-seat {
     display: flex; flex-direction: column; align-items: center;
-    position: relative; width: 70px; transition: transform 0.3s;
+    position: relative; width: 75px; transition: transform 0.3s;
   }
+  /* 手番の強力ハイライト演出 */
+  .turn-indicator-badge {
+    position: absolute; top: -26px; background: var(--gold); color: #000;
+    font-size: 8px; font-weight: 900; padding: 1px 6px; border-radius: 4px;
+    box-shadow: 0 0 10px var(--gold-glow); display: none;
+    animation: bounceTurn 0.6s infinite alternate; z-index: 15;
+  }
+  @keyframes bounceTurn {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-4px); }
+  }
+  .cpu-seat.active .turn-indicator-badge { display: block; }
+  .cpu-seat.active .cpu-silhouette {
+    border-color: #fff;
+    box-shadow: 0 0 25px var(--gold-glow), 0 0 40px rgba(245, 205, 121, 0.9);
+    animation: seatPulse 0.8s infinite alternate;
+  }
+  @keyframes seatPulse {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.12); }
+  }
+
   .cpu-silhouette {
-    width: 44px; height: 44px; border-radius: 50%;
-    background: #111417; border: 1.5px solid rgba(245, 205, 121, 0.4);
+    width: 42px; height: 42px; border-radius: 50%;
+    background: #111417; border: 2px solid rgba(245, 205, 121, 0.4);
     box-shadow: 0 4px 10px rgba(0,0,0,0.8);
     display: flex; justify-content: center; align-items: center;
-    position: absolute; top: -16px; z-index: 1; opacity: 0.85;
+    position: absolute; top: -14px; z-index: 1; transition: 0.25s;
   }
   .cpu-fan-cards {
-    position: relative; width: 52px; height: 40px;
+    position: relative; width: 60px; height: 42px;
     display: flex; justify-content: center; align-items: flex-end;
     margin-top: 12px; z-index: 2;
   }
   .cpu-fan-card {
-    position: absolute; width: 22px; height: 32px; border-radius: 2px;
+    position: absolute; width: 24px; height: 35px; border-radius: 2px;
     background: url('back.jpg') center/cover no-repeat;
     border: 1px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.6);
     transform-origin: 50% 150%;
+    transition: transform 0.4s ease;
   }
   .cpu-hand-img {
     position: absolute; bottom: -20px; left: 50%;
@@ -110,71 +132,101 @@
     pointer-events: none; z-index: 5;
   }
   .cpu-info {
-    background: rgba(10, 10, 10, 0.85); border: 1px solid var(--gold);
+    background: rgba(10, 10, 10, 0.9); border: 1.5px solid var(--gold);
     border-radius: 8px; padding: 2px 6px; font-size: 9px;
-    color: #fff; margin-top: 10px; text-align: center; white-space: nowrap; z-index: 10;
+    color: #fff; margin-top: 8px; text-align: center; white-space: nowrap; z-index: 10;
   }
   .cpu-seat.active .cpu-info {
-    background: var(--gold); color: #111; font-weight: bold;
-    box-shadow: 0 0 10px var(--gold-glow);
+    background: var(--gold); color: #111; font-weight: 900;
+    box-shadow: 0 0 12px var(--gold-glow);
   }
 
-  /* 中央エリア（山札と捨て札スタック） */
+  /* 中央エリア（1.5倍に拡大した山札と捨て札） */
   #center-table-field {
     position: absolute; top: 46%; left: 50%;
     transform: translate(-50%, -50%);
-    display: flex; justify-content: center; align-items: center; gap: 48px;
+    display: flex; justify-content: center; align-items: center; gap: 55px;
     z-index: 25;
   }
+  /* 1.5倍大型山札 (88px × 128px) */
   .deck-3d-stack {
-    position: relative; width: 62px; height: 88px; cursor: pointer;
+    position: relative; width: 88px; height: 128px; cursor: pointer;
   }
   .deck-3d-stack .layer {
-    position: absolute; width: 100%; height: 100%; border-radius: 5px;
+    position: absolute; width: 100%; height: 100%; border-radius: 7px;
     background: url('back.jpg') center/cover no-repeat;
-    border: 1.5px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+    border: 2px solid #fff; box-shadow: 0 3px 6px rgba(0,0,0,0.6);
   }
-  .deck-3d-stack .layer:nth-child(1) { transform: translate(-3px, -3px); }
-  .deck-3d-stack .layer:nth-child(2) { transform: translate(-2px, -2px); }
-  .deck-3d-stack .layer:nth-child(3) { transform: translate(-1px, -1px); }
+  .deck-3d-stack .layer:nth-child(1) { transform: translate(-4px, -4px); }
+  .deck-3d-stack .layer:nth-child(2) { transform: translate(-3px, -3px); }
+  .deck-3d-stack .layer:nth-child(3) { transform: translate(-2px, -2px); }
   .deck-3d-stack .layer:nth-child(4) { transform: translate(0, 0); }
 
+  /* 1.5倍大型捨て札スタック */
   .discard-stack-box {
-    position: relative; width: 135px; height: 88px;
+    position: relative; width: 180px; height: 128px;
   }
   .discard-card-item {
     position: absolute; top: 0; transition: transform 0.2s;
   }
 
+  /* 8の超特大指定マークバッジ */
+  #giant-suit-indicator {
+    position: absolute; top: -50px; left: 50%; transform: translateX(-50%);
+    background: rgba(10, 10, 10, 0.95); border: 3px solid var(--gold);
+    border-radius: 30px; padding: 4px 18px; display: none;
+    align-items: center; gap: 8px; font-weight: 900; font-size: 16px;
+    box-shadow: 0 0 30px var(--gold-glow); z-index: 30;
+    animation: giantGlow 1s infinite alternate;
+  }
+  @keyframes giantGlow {
+    0% { transform: translateX(-50%) scale(1); }
+    100% { transform: translateX(-50%) scale(1.12); box-shadow: 0 0 45px #ffd700; }
+  }
+
+  /* ドロー通知アラートテロップ */
+  #draw-alert-banner {
+    position: absolute; top: 32%; left: 50%; transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #c0392b, #8e1b1b);
+    border: 2px solid #fff; border-radius: 12px;
+    padding: 10px 24px; font-size: 18px; font-weight: 900;
+    box-shadow: 0 0 30px rgba(231,76,60,0.9); z-index: 100;
+    display: none; text-align: center;
+  }
+
   /* 手とカードが一体で飛ぶアニメーションユニット */
   #flying-play-unit {
-    position: absolute; width: 140px; height: 140px;
+    position: absolute; width: 180px; height: 180px;
     pointer-events: none; z-index: 180; display: none;
     transition: transform 0.38s cubic-bezier(0.2, 0.85, 0.32, 1.15), opacity 0.15s ease;
   }
   #flying-card-slot {
-    position: absolute; top: 20px; left: 40px; z-index: 2;
-    transform: scale(0.9);
+    position: absolute; top: 20px; left: 45px; z-index: 2;
   }
   #flying-hand-img {
-    position: absolute; top: 0; left: 0; width: 140px; height: 140px;
+    position: absolute; top: 0; left: 0; width: 180px; height: 180px;
     object-fit: contain; z-index: 3;
   }
 
-  /* 操作ボタン群（英語固定・独立分離） */
-  #top-left-skip-box {
-    position: absolute; top: 52px; left: 12px; z-index: 40;
+  /* ドロー（山札から手元へ飛ぶカード）アニメーション */
+  #flying-draw-card {
+    position: absolute; width: 88px; height: 128px;
+    border-radius: 7px; background: url('back.jpg') center/cover no-repeat;
+    border: 2px solid #fff; box-shadow: 0 6px 15px rgba(0,0,0,0.8);
+    pointer-events: none; z-index: 170; display: none;
+    transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
+
+  /* 操作ボタン群 */
+  #top-left-skip-box { position: absolute; top: 52px; left: 10px; z-index: 40; }
   .btn-skip-round {
     background: linear-gradient(135deg, #d35400, #962d22);
     color: #fff; border: 1.5px solid #f39c12; border-radius: 8px;
-    padding: 8px 12px; font-size: 10px; font-weight: 900; cursor: pointer;
-    box-shadow: 0 3px 8px rgba(0,0,0,0.7); display: none; letter-spacing: 0.5px;
+    padding: 7px 11px; font-size: 10px; font-weight: 900; cursor: pointer;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.7); display: none;
   }
 
-  #bottom-left-dobon {
-    position: absolute; bottom: 85px; left: 14px; z-index: 40;
-  }
+  #bottom-left-dobon { position: absolute; bottom: 85px; left: 12px; z-index: 40; }
   .btn-dobon-huge {
     background: linear-gradient(135deg, #e74c3c, #8e1b1b);
     color: #fff; border: 2.5px solid #ff7675; border-radius: 12px;
@@ -183,19 +235,34 @@
     transition: transform 0.1s;
   }
   .btn-dobon-huge:active { transform: scale(0.93); }
-
-  #bottom-right-last {
-    position: absolute; bottom: 85px; right: 14px; z-index: 40;
+  .btn-dobon-huge.ready {
+    border-color: #ffd700;
+    box-shadow: 0 0 25px rgba(255, 215, 0, 0.95);
+    animation: dobonPulse 0.6s infinite alternate;
   }
+  @keyframes dobonPulse {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.12); }
+  }
+
+  #bottom-right-last { position: absolute; bottom: 85px; right: 12px; z-index: 40; }
   .btn-last-toggle {
     background: linear-gradient(135deg, #2c3e50, #1a252f);
     color: var(--gold); border: 2px solid var(--gold);
     border-radius: 10px; padding: 12px 18px; font-weight: 900;
     font-size: 14px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.6);
-    letter-spacing: 1px;
   }
   .btn-last-toggle.active {
     background: var(--gold); color: #111; box-shadow: 0 0 15px var(--gold-glow);
+  }
+  .btn-last-toggle.urgent {
+    background: #e74c3c; color: #fff; border-color: #ffd700;
+    box-shadow: 0 0 25px rgba(231,76,60,1);
+    animation: urgentFlash 0.5s infinite alternate;
+  }
+  @keyframes urgentFlash {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.15); }
   }
 
   #bottom-center-naki {
@@ -219,54 +286,65 @@
     letter-spacing: 1px;
   }
 
-  /* ユーザー手前POV */
+  /* ユーザー手前POV（1.5倍大型手札） */
   #user-fan-area {
-    position: relative; width: 100%; height: 125px;
+    position: relative; width: 100%; height: 140px;
     display: flex; justify-content: center; align-items: flex-end;
     z-index: 35; flex-shrink: 0; margin-bottom: 2px;
   }
   #user-fan {
-    position: relative; width: 100%; max-width: 480px; height: 100%;
+    position: relative; width: 100%; max-width: 500px; height: 100%;
     display: flex; justify-content: center; align-items: flex-end;
   }
   .user-grip-img {
     position: absolute; bottom: -45px; left: 50%;
-    transform: translateX(-50%) scale(0.42);
+    transform: translateX(-50%) scale(0.46);
     width: 280px; height: 280px; object-fit: contain;
     z-index: 60; pointer-events: none;
   }
 
-  /* トランプカード */
+  /* 1.5倍大型トランプカード (88px × 128px) & カード縁いっぱい画像スタイル */
   .card {
-    width: 60px; height: 88px; background: #fafafa; border-radius: 5px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.6); display: flex; flex-direction: column;
-    justify-content: space-between; padding: 2px 3px; font-weight: bold; cursor: pointer;
-    position: relative; flex-shrink: 0; border: 1px solid #ccc; overflow: hidden;
+    width: 88px; height: 128px; background: #fafafa; border-radius: 7px;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.65); display: flex; flex-direction: column;
+    justify-content: space-between; padding: 4px 5px; font-weight: bold; cursor: pointer;
+    position: relative; flex-shrink: 0; border: 1.5px solid #ccc; overflow: hidden;
   }
   .card.red { color: var(--card-red); }
   .card.black { color: var(--card-black); }
-  .idx-top { font-size: 11px; line-height: 1; font-family: "Georgia", serif; text-align: left; }
-  .idx-bottom { font-size: 11px; line-height: 1; font-family: "Georgia", serif; transform: rotate(180deg); text-align: left; }
   
+  /* カード縁いっぱい（全面）に広がる絵柄写真 */
   .card-face-photo {
-    position: absolute; top: 10px; bottom: 10px; left: 8px; right: 8px;
-    width: calc(100% - 16px); height: calc(100% - 20px);
-    object-fit: cover; border-radius: 2px;
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    object-fit: cover; border-radius: 5px; z-index: 1;
   }
+  
+  /* 絵柄写真の上でもクッキリ読めるインデックス */
+  .idx-top {
+    position: relative; z-index: 2; font-size: 14px; line-height: 1;
+    font-family: "Georgia", serif; text-align: left;
+    text-shadow: 0 0 3px #fff, 0 0 6px #fff, 1px 1px 2px #fff;
+  }
+  .idx-bottom {
+    position: relative; z-index: 2; font-size: 14px; line-height: 1;
+    font-family: "Georgia", serif; transform: rotate(180deg); text-align: left;
+    text-shadow: 0 0 3px #fff, 0 0 6px #fff, 1px 1px 2px #fff;
+  }
+  
   .pips-grid {
-    position: absolute; top: 10px; bottom: 10px; left: 10px; right: 10px;
-    display: grid; align-items: center; justify-items: center;
+    position: absolute; top: 12px; bottom: 12px; left: 12px; right: 12px;
+    display: grid; align-items: center; justify-items: center; z-index: 1;
   }
-  .pip { font-size: 11px; line-height: 1; }
-  .pip-lg { font-size: 26px; }
+  .pip { font-size: 14px; line-height: 1; }
+  .pip-lg { font-size: 34px; }
 
   .fan-card {
-    position: absolute; bottom: 4px; transform-origin: 50% 190%;
+    position: absolute; bottom: 6px; transform-origin: 50% 190%;
     transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.3, 1), box-shadow 0.2s;
   }
   .fan-card.selected {
-    box-shadow: 0 12px 24px rgba(245, 205, 121, 0.95) !important;
-    border: 2.5px solid var(--gold) !important; z-index: 75 !important;
+    box-shadow: 0 14px 28px rgba(245, 205, 121, 0.95) !important;
+    border: 3px solid var(--gold) !important; z-index: 75 !important;
   }
 
   /* モーダル共通 */
@@ -278,21 +356,53 @@
   .modal-content {
     background: linear-gradient(145deg, #231b14, #120e0a);
     border: 2px solid var(--gold); border-radius: 14px;
-    padding: 18px 22px; text-align: center; max-width: 92%; min-width: 290px;
+    padding: 16px 20px; text-align: center; max-width: 92%; min-width: 290px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.95);
   }
+
+  /* WIN画面：盤面や他人の手札が隠れないスリム上部バナーモード */
+  #result-modal {
+    align-items: flex-start; padding-top: 15px;
+    background: rgba(0, 0, 0, 0.65); /* 背景を透かして盤面を見せる */
+  }
+  #result-modal .modal-content {
+    width: 92%; max-width: 420px; padding: 12px 16px;
+    background: rgba(22, 17, 13, 0.92);
+  }
+  .minimized-banner {
+    display: none; position: fixed; top: 45px; left: 50%; transform: translateX(-50%);
+    background: rgba(18, 14, 10, 0.92); border: 2px solid var(--gold);
+    border-radius: 20px; padding: 6px 16px; z-index: 250; font-size: 12px; font-weight: 900;
+    cursor: pointer; box-shadow: 0 0 15px var(--gold-glow);
+  }
+
   .modal-btn {
     background: linear-gradient(135deg, var(--gold), #b38924);
-    color: #111; font-size: 13px; padding: 9px 18px;
-    border: none; border-radius: 6px; cursor: pointer; font-weight: 900; margin: 4px;
+    color: #111; font-size: 13px; padding: 8px 16px;
+    border: none; border-radius: 6px; cursor: pointer; font-weight: 900; margin: 3px;
     letter-spacing: 0.5px;
   }
   .suit-btn {
     font-size: 28px; padding: 6px 16px; margin: 4px; cursor: pointer;
     border-radius: 6px; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.06);
   }
-  .history-table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 8px; }
-  .history-table th, .history-table td { border: 1px solid rgba(245,205,121,0.3); padding: 5px; text-align: center; }
+
+  /* 大会履歴アコーディオンUI */
+  .accordion-item {
+    border: 1px solid rgba(245, 205, 121, 0.35); border-radius: 6px;
+    margin-bottom: 8px; overflow: hidden; background: rgba(0,0,0,0.4);
+  }
+  .accordion-header {
+    background: rgba(245, 205, 121, 0.15); padding: 7px 10px;
+    font-size: 11px; font-weight: bold; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .accordion-content {
+    display: none; padding: 6px; border-top: 1px solid rgba(245, 205, 121, 0.2);
+  }
+  .accordion-item.open .accordion-content { display: block; }
+  .history-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  .history-table th, .history-table td { border: 1px solid rgba(245,205,121,0.25); padding: 4px; text-align: center; }
   .history-table th { background: rgba(245,205,121,0.2); color: var(--gold); }
 </style>
 </head>
@@ -300,7 +410,7 @@
 
 <div id="casino-bg"></div>
 
-<!-- ヘッダー（ボタンは英語固定） -->
+<!-- ヘッダー（ボタン英語固定） -->
 <header>
   <div style="display:flex; gap:5px; align-items:center;">
     <button class="header-btn" onclick="toggleLang()" id="lang-btn">EN</button>
@@ -320,21 +430,26 @@
     <div id="cpu-arc-container"></div>
 
     <div id="center-table-field">
+      <!-- 1.5倍大型山札 -->
       <div style="text-align:center;">
         <div class="deck-3d-stack" onclick="onDeckClick()">
           <div class="layer"></div><div class="layer"></div><div class="layer"></div><div class="layer"></div>
         </div>
-        <div style="font-size:10px; margin-top:4px; color:#f1f2f6;">DECK (<span id="deck-count">0</span>)</div>
+        <div style="font-size:11px; margin-top:5px; color:#f1f2f6; font-weight:bold;">DECK (<span id="deck-count">0</span>)</div>
       </div>
 
-      <div style="text-align:center;">
+      <!-- 1.5倍大型捨て札 -->
+      <div style="text-align:center; position:relative;">
+        <div id="giant-suit-indicator">SUIT: <span id="giant-suit-symbol" style="font-size:22px;">♠</span></div>
         <div class="discard-stack-box" id="discard-stack-box"></div>
-        <div style="font-size:10px; margin-top:4px; color:#f1f2f6;">
+        <div style="font-size:11px; margin-top:5px; color:#f1f2f6; font-weight:bold;">
           PILE (<b id="discard-sum-val" style="color:var(--gold);">0</b>)
-          <span id="target-suit-badge" style="display:none; color:var(--gold); font-weight:bold; margin-left:4px;"></span>
         </div>
       </div>
     </div>
+
+    <!-- ドロー警告アラートテロップ -->
+    <div id="draw-alert-banner"></div>
 
     <div style="text-align:center; font-size:11px; z-index:20; margin-bottom: 2px;">
       <span id="dir-display">CCW</span> | 
@@ -343,11 +458,14 @@
     </div>
   </div>
 
-  <!-- 手とカードが一体で飛ぶアニメーションユニット -->
+  <!-- 手とカードが一体で飛ぶユニット -->
   <div id="flying-play-unit">
     <div id="flying-card-slot"></div>
     <img id="flying-hand-img" src="discard.png" alt="Hand">
   </div>
+
+  <!-- ドロー飛翔カード -->
+  <div id="flying-draw-card"></div>
 </div>
 
 <!-- 操作ボタン群 -->
@@ -356,7 +474,7 @@
 </div>
 
 <div id="bottom-left-dobon">
-  <button class="btn-dobon-huge" onclick="triggerUserDobon()">DOBON</button>
+  <button class="btn-dobon-huge" id="dobon-btn" onclick="triggerUserDobon()">DOBON</button>
 </div>
 
 <div id="bottom-right-last">
@@ -370,7 +488,7 @@
 
 <button id="confirm-naki-btn" onclick="confirmNaki()">CONFIRM</button>
 
-<!-- ユーザー手前POV -->
+<!-- ユーザー手前POV（1.5倍大型手札） -->
 <div id="user-fan-area">
   <div id="user-fan"></div>
   <img class="user-grip-img" src="me.png" alt="My Hand">
@@ -420,38 +538,48 @@
   </div>
 </div>
 
-<!-- ラウンド終了モーダル -->
+<!-- WIN画面：盤面や他人の手札が見えるスリムモーダル ＆ 最小化機能 -->
 <div class="modal-overlay" id="result-modal" style="display:none;">
   <div class="modal-content">
-    <h3 id="result-title" style="margin:2px 0 8px; color:var(--gold);">ROUND RESULT</h3>
-    <div id="result-detail" style="text-align:left; font-size:11px; line-height:1.5; margin:8px 0; max-height:220px; overflow-y:auto;"></div>
-    <button class="modal-btn" onclick="openScoreHistoryModal()">HISTORY</button>
-    <button class="modal-btn" onclick="suspendGame()">SAVE & QUIT</button>
-    <button class="modal-btn" onclick="nextRound()">NEXT ROUND</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+      <h3 id="result-title" style="margin:0; color:var(--gold); font-size:16px;">ROUND RESULT</h3>
+      <button class="header-btn" onclick="toggleMinimizeResult()" id="btn-toggle-view">VIEW TABLE</button>
+    </div>
+    <div id="result-detail" style="text-align:left; font-size:11px; line-height:1.4; margin:6px 0; max-height:160px; overflow-y:auto;"></div>
+    <div style="display:flex; justify-content:center; gap:4px; margin-top:8px;">
+      <button class="modal-btn" onclick="openScoreHistoryModal()">HISTORY</button>
+      <button class="modal-btn" onclick="suspendGame()">SAVE & QUIT</button>
+      <button class="modal-btn" onclick="nextRound()">NEXT ROUND</button>
+    </div>
   </div>
+</div>
+
+<!-- 最小化時に復帰するフローティングバー -->
+<div class="minimized-banner" id="minimized-restore-bar" onclick="toggleMinimizeResult()">
+  ▲ RESTORE RESULT DIALOG ▲
 </div>
 
 <!-- 10回終了時：大会結果発表モーダル -->
 <div class="modal-overlay" id="championship-modal" style="display:none;">
   <div class="modal-content">
     <h2 style="margin:2px 0 8px; color:var(--gold); font-family:Georgia, serif;">★ CHAMPIONSHIP RESULT ★</h2>
-    <div id="champ-rankings" style="text-align:left; font-size:12px; line-height:1.6; margin:12px 0; max-height:220px; overflow-y:auto;"></div>
+    <div id="champ-rankings" style="text-align:left; font-size:12px; line-height:1.6; margin:10px 0; max-height:200px; overflow-y:auto;"></div>
     <button class="modal-btn" style="background:#27ae60; color:#fff;" onclick="continueChampionship()">CONTINUE (ROUND 11~)</button>
     <button class="modal-btn" style="background:#e67e22; color:#fff;" onclick="resetChampionship()">RESET & RESTART</button>
     <button class="modal-btn" style="background:#7f8c8d; color:#fff;" onclick="quitToTitle()">QUIT TO TITLE</button>
   </div>
 </div>
 
-<!-- スコア履歴モーダル -->
+<!-- アコーディオン式スコア履歴モーダル -->
 <div class="modal-overlay" id="history-modal" style="display:none;">
-  <div class="modal-content" style="max-width:96%; width:400px;">
-    <h3 style="margin:2px 0 6px; color:var(--gold);">SCORE HISTORY</h3>
-    <div id="history-table-container" style="max-height:250px; overflow-y:auto;"></div>
-    <button class="modal-btn" onclick="closeScoreHistoryModal()">CLOSE</button>
+  <div class="modal-content" style="max-width:96%; width:440px;">
+    <h3 style="margin:2px 0 6px; color:var(--gold);">CHAMPIONSHIP HISTORY</h3>
+    <div id="accordion-history-container" style="max-height:280px; overflow-y:auto; text-align:left;"></div>
+    <button class="modal-btn" style="margin-top:8px;" onclick="closeScoreHistoryModal()">CLOSE</button>
   </div>
 </div>
 
-<!-- ゲーム全ロジック読み込み -->
+<!-- 外部JavaScript読み込み -->
 <script src="game.js"></script>
 </body>
 </html>

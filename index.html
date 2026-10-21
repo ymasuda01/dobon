@@ -147,9 +147,9 @@
   }
   @keyframes giantGlow { 0%{transform:translateX(-50%) scale(1)} 100%{transform:translateX(-50%) scale(1.1); box-shadow: 0 0 40px #ffd700;} }
   
-  /* 【修正】手前側HUD（タイマー）：場のカードの下、操作ボタンのすぐ上の手前側に適度に下げて配置 */
+  /* 手前側HUD（タイマー）：カードとボタンの間の広い安全スペースへ配置 */
   #hud-time-container {
-    position: absolute; bottom: 215px; left: 50%; transform: translateX(-50%);
+    position: absolute; bottom: 75px; left: 50%; transform: translateX(-50%);
     display: flex; align-items: center; gap: 12px; z-index: 45;
     background: rgba(10, 8, 6, 0.88); border: 1.5px solid rgba(245, 205, 121, 0.5);
     padding: 4px 18px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.9);

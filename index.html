@@ -17,88 +17,40 @@
     margin: 0; padding: 0; background: #08080a; color: #fff;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", sans-serif;
     height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
-    position: relative; transition: box-shadow 0.5s ease;
+    position: relative; transition: filter 0.5s ease;
   }
-
-  /* 彩度を保ったドラマチックな敗北・被ドボン・チョンボ演出 */
-  body.mood-defeat {
-    box-shadow: inset 0 0 120px rgba(10, 5, 20, 0.85);
-  }
-  body.mood-disaster {
-    box-shadow: inset 0 0 150px rgba(180, 20, 20, 0.9), inset 0 0 80px rgba(0, 0, 0, 0.95);
-    animation: screenShake 0.4s ease;
-  }
-  @keyframes screenShake {
-    0%,100%{transform:translate(0,0)} 20%{transform:translate(-8px,6px)}
-    40%{transform:translate(8px,-6px)} 60%{transform:translate(-5px,3px)} 80%{transform:translate(5px,-3px)}
-  }
-
-  /* 勝利時の特大WINNER!大当たり演出バナー */
-  #winner-jackpot-banner {
-    position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0);
-    color: #fff; font-family: "Georgia", serif; font-size: 42px; font-weight: 900;
-    text-shadow: 0 0 20px #ffd700, 0 0 40px #f39c12, 0 0 60px #e67e22;
-    z-index: 280; pointer-events: none; display: none; text-align: center;
-    letter-spacing: 3px;
-  }
-  #winner-jackpot-banner.show {
-    display: block; animation: jackpotPop 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  }
-  @keyframes jackpotPop {
-    0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
-    50% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-  }
-
-  #flash-overlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: #fff; opacity: 0; pointer-events: none; z-index: 300; transition: opacity 0.08s ease-out;
-  }
-  #flash-overlay.active { opacity: 0.85; transition: none; }
-  
-  #confetti-canvas {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    pointer-events: none; z-index: 260; display: none;
-  }
-
+  body.mood-defeat { filter: brightness(0.7) contrast(1.1) saturate(0.6); }
+  body.mood-disaster { filter: brightness(0.35) contrast(1.4) drop-shadow(0 0 25px #e74c3c); animation: shake 0.4s ease; }
+  @keyframes shake { 0%,100%{transform:translate(0,0)} 20%{transform:translate(-8px,6px)} 40%{transform:translate(8px,-6px)} 60%{transform:translate(-5px,3px)} 80%{transform:translate(5px,-3px)} }
+  #flash-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; opacity: 0; pointer-events: none; z-index: 300; transition: opacity 0.08s ease-out; }
+  #flash-overlay.active { opacity: 0.8; transition: none; }
+  #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 250; display: none; }
   #casino-bg {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background: radial-gradient(circle at 50% 25%, rgba(20,10,5,0.2) 0%, rgba(5,5,5,0.85) 100%),
-                url('background.png') right center / cover no-repeat;
+    background: radial-gradient(circle at 50% 25%, rgba(20,10,5,0.2) 0%, rgba(5,5,5,0.85) 100%), url('background.png') right center / cover no-repeat;
     filter: blur(4px) brightness(0.65); transform: scale(1.05); z-index: 1; pointer-events: none;
   }
-
-  /* ヘッダー */
   header {
-    background: rgba(12, 10, 8, 0.94); backdrop-filter: blur(10px);
-    border-bottom: 2px solid rgba(245, 205, 121, 0.35);
-    padding: 6px 12px; display: flex; justify-content: space-between; align-items: center;
-    font-size: 11px; z-index: 60; flex-shrink: 0; gap: 4px;
+    background: rgba(12, 10, 8, 0.94); backdrop-filter: blur(10px); border-bottom: 2px solid rgba(245, 205, 121, 0.35);
+    padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; z-index: 60; flex-shrink: 0; gap: 4px;
   }
   .header-btn {
     background: rgba(45, 35, 25, 0.9); color: var(--gold); border: 1.5px solid var(--gold);
-    border-radius: 5px; padding: 4px 8px; font-size: 10px; font-weight: 900; cursor: pointer;
+    border-radius: 5px; padding: 4px 7px; font-size: 10px; font-weight: 900; cursor: pointer;
   }
   .mult-tag { background: #e74c3c; color: #fff; padding: 1px 5px; border-radius: 8px; font-weight: bold; font-size: 9px; }
-
-  /* 3Dカジノテーブル */
   #table-perspective {
     flex: 1; position: relative; perspective: 700px; display: flex; justify-content: center; align-items: flex-end;
     overflow: hidden; z-index: 10; margin-top: -10px;
   }
   #poker-table {
-    width: 98%; height: 92%;
-    background: radial-gradient(ellipse at 50% 65%, #229962 0%, #157347 55%, #0b4528 100%);
-    border: 14px solid #3a1e0b; border-bottom: none;
-    box-shadow: inset 0 0 60px rgba(0,0,0,0.85), 0 20px 40px rgba(0,0,0,0.95);
-    border-radius: 240px 240px 30px 30px; transform: rotateX(46deg);
-    position: relative; display: flex; flex-direction: column; justify-content: space-between;
-    padding: 8px 12px; transform-style: preserve-3d;
+    width: 98%; height: 92%; background: radial-gradient(ellipse at 50% 65%, #229962 0%, #157347 55%, #0b4528 100%);
+    border: 14px solid #3a1e0b; border-bottom: none; box-shadow: inset 0 0 60px rgba(0,0,0,0.85), 0 20px 40px rgba(0,0,0,0.95);
+    border-radius: 240px 240px 30px 30px; transform: rotateX(46deg); position: relative; display: flex;
+    flex-direction: column; justify-content: space-between; padding: 8px 12px; transform-style: preserve-3d;
   }
-
-  /* 相手CPU（立ち上げ立体配置） */
   #cpu-arc-container {
-    position: absolute; top: 8px; left: 0; width: 100%; height: 110px;
+    position: absolute; top: 12px; left: 0; width: 100%; height: 110px;
     display: flex; justify-content: space-around; align-items: flex-start; z-index: 20; transform-style: preserve-3d;
   }
   .cpu-seat {
@@ -108,6 +60,21 @@
   .cpu-billboard-stand {
     transform: rotateX(-46deg) translateZ(15px); display: flex; flex-direction: column; align-items: center; transform-origin: 50% 100%;
   }
+  
+  .cpu-seat.dobon-attacker { z-index: 120 !important; }
+  .cpu-seat.dobon-attacker .cpu-billboard-stand {
+    transform: rotateX(-46deg) translateZ(40px) scale(1.3) !important;
+  }
+  .cpu-seat.dobon-attacker .cpu-silhouette {
+    border-color: #ff3838 !important;
+    box-shadow: 0 0 35px #ff3838, 0 0 50px rgba(255, 56, 56, 0.9) !important;
+    animation: attackerFlash 0.35s infinite alternate !important;
+  }
+  @keyframes attackerFlash {
+    0% { box-shadow: 0 0 20px #ff3838; border-color: #ffd700; }
+    100% { box-shadow: 0 0 50px #ff3838, 0 0 30px #ffd700; border-color: #fff; }
+  }
+
   .turn-indicator-badge {
     position: absolute; top: -26px; background: var(--gold); color: #000; font-size: 8px; font-weight: 900;
     padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 10px var(--gold-glow); display: none;
@@ -119,7 +86,6 @@
     border-color: #fff; box-shadow: 0 0 25px var(--gold-glow), 0 0 45px rgba(245, 205, 121, 0.95); animation: seatPulse 0.8s infinite alternate;
   }
   @keyframes seatPulse { 0%{transform:scale(1)} 100%{transform:scale(1.12)} }
-
   .cpu-silhouette {
     width: 44px; height: 44px; border-radius: 50%; background: #111417; border: 2px solid rgba(245,205,121,0.5);
     box-shadow: 0 4px 10px rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1;
@@ -139,10 +105,29 @@
   }
   .cpu-seat.active .cpu-info { background: var(--gold); color: #111; font-weight: 900; box-shadow: 0 0 12px var(--gold-glow); }
 
-  /* 中央山札＆捨て札 */
+  #hud-time-container {
+    position: absolute; top: 125px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; z-index: 30;
+  }
+  #timer-badge {
+    background: rgba(15,12,10,0.85); border: 1.5px solid var(--gold); padding: 3px 12px;
+    border-radius: 20px; font-size: 11px; font-weight: 900; box-shadow: 0 0 10px rgba(0,0,0,0.8);
+  }
+  #timer-badge.urgent { background: #c0392b; border-color: #ff7675; color: #fff; box-shadow: 0 0 20px #e74c3c; animation: timerUrgent 0.5s infinite alternate; }
+  @keyframes timerUrgent { 0%{transform:scale(1)} 100%{transform:scale(1.12)} }
+
+  /* 10秒ドボン返し猶予バナー */
+  #dobon-gaeshi-banner {
+    position: absolute; top: 26%; left: 50%; transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, #d63031, #780e0e);
+    border: 3px solid var(--gold); border-radius: 30px;
+    padding: 8px 24px; font-size: 16px; font-weight: 900; color: #fff;
+    box-shadow: 0 0 40px rgba(255, 75, 75, 0.9); z-index: 110; display: none; text-align: center;
+    animation: bannerPulse 0.5s infinite alternate;
+  }
+  @keyframes bannerPulse { 0%{transform:translate(-50%,-50%) scale(1)} 100%{transform:translate(-50%,-50%) scale(1.08); box-shadow:0 0 50px #ff4b4b;} }
+
   #center-table-field {
-    position: absolute; top: 44%; left: 50%; transform: translate(-50%, -50%);
-    display: flex; justify-content: center; align-items: center; gap: 48px; z-index: 25;
+    position: absolute; top: 48%; left: 50%; transform: translate(-50%, -50%); display: flex; justify-content: center; align-items: center; gap: 50px; z-index: 25;
   }
   .deck-3d-stack { position: relative; width: 92px; height: 134px; cursor: pointer; }
   .deck-3d-stack .layer {
@@ -154,56 +139,17 @@
   .discard-stack-box { position: relative; width: 190px; height: 134px; }
   .discard-card-item { position: absolute; top: 0; transition: transform 0.2s; }
 
-  /* 山札より手前（下側）に配置された時間HUD ＆ 8の特大指定マーク */
-  #foreground-hud-bar {
-    position: absolute; top: 67%; left: 50%; transform: translate(-50%, -50%);
-    display: flex; align-items: center; justify-content: center; gap: 14px;
-    z-index: 35; width: 100%; pointer-events: none;
-  }
-  /* ハートビート脈動する強調タイマー */
-  #timer-badge-heartbeat {
-    background: linear-gradient(135deg, rgba(40,25,10,0.92), rgba(20,10,5,0.95));
-    border: 2px solid var(--gold); padding: 5px 18px; border-radius: 25px;
-    font-size: 14px; font-weight: 900; color: #fff;
-    box-shadow: 0 0 15px rgba(245, 205, 121, 0.6);
-    animation: heartBeatNorm 1.2s infinite ease-in-out;
-  }
-  @keyframes heartBeatNorm {
-    0% { transform: scale(1); box-shadow: 0 0 10px rgba(245,205,121,0.5); }
-    15% { transform: scale(1.08); box-shadow: 0 0 20px rgba(245,205,121,0.85); }
-    30% { transform: scale(1); box-shadow: 0 0 10px rgba(245,205,121,0.5); }
-    45% { transform: scale(1.05); box-shadow: 0 0 16px rgba(245,205,121,0.7); }
-    60% { transform: scale(1); }
-  }
-  #timer-badge-heartbeat.urgent {
-    background: linear-gradient(135deg, #c0392b, #8e1b1b); border-color: #ff7675; color: #fff;
-    animation: heartBeatFast 0.6s infinite ease-in-out;
-  }
-  @keyframes heartBeatFast {
-    0% { transform: scale(1); box-shadow: 0 0 15px #e74c3c; }
-    25% { transform: scale(1.15); box-shadow: 0 0 30px #ff7675; }
-    50% { transform: scale(1); box-shadow: 0 0 15px #e74c3c; }
-    75% { transform: scale(1.12); box-shadow: 0 0 25px #ff7675; }
-    100% { transform: scale(1); }
-  }
-
-  /* 手前に大きく出る8の指定マーク */
   #giant-suit-indicator {
-    background: rgba(10, 10, 10, 0.95); border: 2.5px solid var(--gold);
-    border-radius: 25px; padding: 3px 16px; display: none; align-items: center; gap: 8px;
-    font-weight: 900; font-size: 14px; box-shadow: 0 0 25px var(--gold-glow);
-    animation: suitPulse 1s infinite alternate;
+    position: absolute; top: -56px; left: 50%; transform: translateX(-50%); background: rgba(10,10,10,0.95);
+    border: 3px solid var(--gold); border-radius: 30px; padding: 4px 20px; display: none; align-items: center;
+    gap: 8px; font-weight: 900; font-size: 16px; box-shadow: 0 0 30px var(--gold-glow); z-index: 30; animation: giantGlow 1s infinite alternate;
   }
-  @keyframes suitPulse { 0%{transform:scale(1)} 100%{transform:scale(1.1); box-shadow: 0 0 35px #ffd700;} }
-
+  @keyframes giantGlow { 0%{transform:translateX(-50%) scale(1)} 100%{transform:translateX(-50%) scale(1.1); box-shadow: 0 0 45px #ffd700;} }
   #draw-alert-banner {
-    position: absolute; top: 26%; left: 50%; transform: translate(-50%, -50%);
-    background: linear-gradient(135deg, #c0392b, #8e1b1b); border: 2px solid #fff; border-radius: 12px;
-    padding: 10px 24px; font-size: 18px; font-weight: 900; box-shadow: 0 0 30px rgba(231,76,60,0.9);
-    z-index: 100; display: none; text-align: center;
+    position: absolute; top: 32%; left: 50%; transform: translate(-50%, -50%); background: linear-gradient(135deg, #c0392b, #8e1b1b);
+    border: 2px solid #fff; border-radius: 12px; padding: 10px 24px; font-size: 18px; font-weight: 900;
+    box-shadow: 0 0 30px rgba(231,76,60,0.9); z-index: 100; display: none; text-align: center;
   }
-
-  /* 打牌＆ドローアニメーション */
   #flying-play-unit {
     position: absolute; width: 180px; height: 180px; pointer-events: none; z-index: 180; display: none;
     transition: transform 0.38s cubic-bezier(0.2, 0.85, 0.32, 1.15), opacity 0.15s ease;
@@ -216,9 +162,9 @@
     transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
 
-  /* 操作ボタン群（手札の上に配置） */
+  /* コントロールバー */
   #table-control-bar {
-    position: absolute; bottom: 168px; left: 0; width: 100%; display: flex; justify-content: space-between;
+    position: absolute; bottom: 165px; left: 0; width: 100%; display: flex; justify-content: space-between;
     align-items: center; padding: 0 16px; z-index: 50; pointer-events: none;
   }
   #table-control-bar * { pointer-events: auto; }
@@ -232,6 +178,13 @@
     border-color: #ffd700; box-shadow: 0 0 25px rgba(255, 215, 0, 0.95); animation: dobonPulse 0.6s infinite alternate;
   }
   @keyframes dobonPulse { 0%{transform:scale(1)} 100%{transform:scale(1.12)} }
+  .btn-dobon-huge.gaeshi-mode {
+    background: linear-gradient(135deg, #ff4757, #ff6b81) !important;
+    border-color: #fff !important; box-shadow: 0 0 35px #ff4757, 0 0 50px #ffd700 !important;
+    animation: gaeshiPulse 0.4s infinite alternate !important;
+  }
+  @keyframes gaeshiPulse { 0%{transform:scale(1)} 100%{transform:scale(1.18)} }
+
   .btn-last-toggle {
     background: linear-gradient(135deg, #2c3e50, #1a252f); color: var(--gold); border: 2px solid var(--gold);
     border-radius: 10px; padding: 11px 16px; font-weight: 900; font-size: 13px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.6);
@@ -249,7 +202,7 @@
   }
   .btn-naki.active { background: #e67e22; color: #fff; border-color: #f39c12; }
   #confirm-naki-btn {
-    position: absolute; bottom: 218px; left: 50%; transform: translateX(-50%); background: #27ae60;
+    position: absolute; bottom: 215px; left: 50%; transform: translateX(-50%); background: #27ae60;
     color: #fff; border: 2px solid #2ecc71; border-radius: 8px; padding: 8px 24px; font-size: 14px;
     font-weight: 900; display: none; z-index: 55; box-shadow: 0 0 15px rgba(46,204,113,0.8); letter-spacing: 1px;
   }
@@ -259,7 +212,7 @@
     border-radius: 8px; padding: 7px 11px; font-size: 10px; font-weight: 900; cursor: pointer; display: none;
   }
 
-  /* ユーザー手札（底上げ＆2段展開） */
+  /* ユーザー手札 */
   #user-fan-area {
     position: relative; width: 100%; height: 165px; display: flex; justify-content: center;
     align-items: flex-end; z-index: 35; flex-shrink: 0; padding-bottom: 8px;
@@ -270,35 +223,28 @@
     width: 280px; height: 280px; object-fit: contain; z-index: 60; pointer-events: none;
   }
 
-  /* 1.5倍大型カード */
   .card {
     width: 92px; height: 134px; background: #fafafa; border-radius: 7px;
-    box-shadow: 0 3px 8px rgba(0,0,0,0.65); display: block;
-    font-weight: bold; cursor: pointer; position: relative; flex-shrink: 0;
-    border: 1.5px solid #ccc; overflow: hidden;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.65); display: flex; flex-direction: column;
+    justify-content: space-between; padding: 4px 6px; font-weight: bold; cursor: pointer;
+    position: relative; flex-shrink: 0; border: 1.5px solid #ccc; overflow: hidden;
   }
   .card.red { color: var(--card-red); }
   .card.black { color: var(--card-black); }
   .card-face-photo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 5px; z-index: 1; }
-  
-  /* カードの左上・右下へ確実に絶対配置されるインデックス（ズレ完全解消） */
   .idx-top {
-    position: absolute; top: 4px; left: 5px; z-index: 3;
-    font-size: 16px; line-height: 1.05; font-family: "Georgia", serif; text-align: left;
+    position: relative; z-index: 2; font-size: 16px; line-height: 1; font-family: "Georgia", serif;
     text-shadow: 0 0 3px #fff, 0 0 6px #fff, 1px 1px 2px #fff;
   }
   .idx-bottom {
-    position: absolute; bottom: 4px; right: 5px; z-index: 3;
-    font-size: 16px; line-height: 1.05; font-family: "Georgia", serif; text-align: left;
+    position: relative; z-index: 2; font-size: 16px; line-height: 1; font-family: "Georgia", serif;
     transform: rotate(180deg); text-shadow: 0 0 3px #fff, 0 0 6px #fff, 1px 1px 2px #fff;
   }
-  
-  .pips-container-real { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+  .pips-container-real { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
   .pip-real { position: absolute; font-size: 18px; line-height: 1; transform: translate(-50%, -50%); }
   .pip-real.flip { transform: translate(-50%, -50%) rotate(180deg); }
   .pip-center-huge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 44px; line-height: 1; }
 
-  /* ファン展開＆2段化クラス */
   .fan-card {
     position: absolute; bottom: 8px; transform-origin: 50% 190%;
     transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.3, 1), box-shadow 0.2s;
@@ -309,7 +255,6 @@
   .fan-card.row-back { bottom: 36px !important; z-index: 30 !important; filter: brightness(0.92); }
   .fan-card.row-front { bottom: 2px !important; z-index: 45 !important; }
 
-  /* 8のマーク選択（手札が見える明るいフロートUI） */
   #suit-select-floating {
     position: fixed; top: 46%; left: 50%; transform: translate(-50%, -50%);
     background: #fdfaf6; border: 3px solid var(--gold); border-radius: 16px;
@@ -321,7 +266,6 @@
     border-radius: 8px; border: 1.5px solid #ccc; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
   }
 
-  /* モーダル */
   .modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(5, 5, 5, 0.92);
     backdrop-filter: blur(10px); display: flex; justify-content: center; align-items: center; z-index: 200;
@@ -343,7 +287,6 @@
     padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 900; margin: 3px;
   }
 
-  /* アコーディオン履歴 */
   .accordion-item {
     border: 1px solid rgba(245, 205, 121, 0.35); border-radius: 6px; margin-bottom: 8px; overflow: hidden; background: rgba(0,0,0,0.4);
   }
@@ -364,12 +307,11 @@
 <canvas id="confetti-canvas"></canvas>
 <div id="casino-bg"></div>
 
-<!-- 勝利時大当たりバナー -->
-<div id="winner-jackpot-banner">★ WINNER! ★</div>
-
+<!-- ヘッダー（PAYOUTボタン追加） -->
 <header>
   <div style="display:flex; gap:5px; align-items:center;">
     <button class="header-btn" onclick="toggleLang()" id="lang-btn">EN</button>
+    <button class="header-btn" onclick="openPayoutModal()">PAYOUT</button>
     <button class="header-btn" onclick="suspendGame()">SAVE & QUIT</button>
     <button class="header-btn" style="border-color:#e74c3c; color:#ff7675;" onclick="quitToTitle()">QUIT</button>
     <div>R<span id="round-num" style="color:var(--gold); font-weight:bold;">1</span> <span class="mult-tag" id="multiplier-display">1x</span></div>
@@ -385,6 +327,17 @@
   <div id="poker-table">
     <div id="cpu-arc-container"></div>
 
+    <div id="hud-time-container">
+      <span id="dir-display" style="font-size:11px; font-weight:bold;">CCW</span>
+      <div id="timer-badge">TIME: <span id="timer-sec">--</span></div>
+      <span style="font-size:11px;">DRAW: <b id="draw-stack" style="color:#ff7675;">0</b></span>
+    </div>
+
+    <!-- 10秒ドボン返し猶予バナー -->
+    <div id="dobon-gaeshi-banner">
+      DOBON! COUNTER CHANCE: <span id="gaeshi-countdown">10</span>s
+    </div>
+
     <div id="center-table-field">
       <div style="text-align:center;">
         <div class="deck-3d-stack" onclick="onDeckClick()">
@@ -393,6 +346,7 @@
         <div style="font-size:11px; margin-top:5px; color:#f1f2f6; font-weight:bold;">DECK (<span id="deck-count">0</span>)</div>
       </div>
       <div style="text-align:center; position:relative;">
+        <div id="giant-suit-indicator">SUIT: <span id="giant-suit-symbol" style="font-size:22px;">♠</span></div>
         <div class="discard-stack-box" id="discard-stack-box"></div>
         <div style="font-size:11px; margin-top:5px; color:#f1f2f6; font-weight:bold;">
           PILE (<b id="discard-sum-val" style="color:var(--gold);">0</b>)
@@ -400,25 +354,16 @@
       </div>
     </div>
 
-    <!-- 山札の手前（下側）に配置された時間HUD ＆ 8の特大指定マーク -->
-    <div id="foreground-hud-bar">
-      <span id="dir-display" style="font-size:11px; font-weight:bold;">CCW</span>
-      <div id="timer-badge-heartbeat">TIME: <span id="timer-sec">--</span></div>
-      <div id="giant-suit-indicator">SUIT: <span id="giant-suit-symbol" style="font-size:22px;">♠</span></div>
-      <span style="font-size:11px;">DRAW: <b id="draw-stack" style="color:#ff7675;">0</b></span>
-    </div>
-
     <div id="draw-alert-banner"></div>
   </div>
 
   <div id="flying-play-unit">
     <div id="flying-card-slot"></div>
-    <img id="flying-hand-img" src="discard.png" alt="" onerror="this.style.display='none'">
+    <img id="flying-hand-img" src="discard.png" alt="Hand">
   </div>
   <div id="flying-draw-card"></div>
 </div>
 
-<!-- ボタン群（手札の上に安全配置） -->
 <div id="table-control-bar">
   <button class="btn-dobon-huge" id="dobon-btn" onclick="triggerUserDobon()">DOBON</button>
   <div id="naki-center-group">
@@ -433,13 +378,11 @@
   <button class="btn-skip-round" id="skip-chombo-btn" onclick="skipChomboRound()">SKIP ROUND (-10pt)</button>
 </div>
 
-<!-- ユーザー手札（1.5倍・2段化対応） -->
 <div id="user-fan-area">
   <div id="user-fan"></div>
-  <img class="user-grip-img" src="me.png" alt="" onerror="this.style.display='none'">
+  <img class="user-grip-img" src="me.png" alt="My Hand">
 </div>
 
-<!-- 8マーク選択（手札が見える明るいフロートUI） -->
 <div id="suit-select-floating">
   <div style="font-size:13px; margin-bottom:8px; color:#333; font-weight:bold;" id="txt-choose-suit">SELECT SUIT</div>
   <button class="suit-btn" style="color:#11141a;" onclick="selectSuit('♠')">♠</button>
@@ -448,7 +391,6 @@
   <button class="suit-btn" style="color:#11141a;" onclick="selectSuit('♣')">♣</button>
 </div>
 
-<!-- 開始モーダル -->
 <div class="modal-overlay" id="start-modal">
   <div class="modal-content">
     <h2 style="margin:2px 0 12px; color:var(--gold); font-family:Georgia, serif; letter-spacing:1px;">DOBON MASTER</h2>
@@ -477,7 +419,6 @@
   </div>
 </div>
 
-<!-- WIN画面（盤面確認対応） -->
 <div class="modal-overlay" id="result-modal" style="display:none;">
   <div class="modal-content">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -495,7 +436,37 @@
 
 <div class="minimized-banner" id="minimized-restore-bar" onclick="toggleMinimizeResult()">▲ RESTORE RESULT DIALOG ▲</div>
 
-<!-- 10回終了時大会表彰 -->
+<!-- 点数表モーダル (San Diego Official Payout Table) -->
+<div class="modal-overlay" id="payout-modal" style="display:none;">
+  <div class="modal-content" style="max-width:96%; width:440px;">
+    <h3 style="margin:2px 0 6px; color:var(--gold);">PAYOUT TABLE</h3>
+    <div style="max-height:280px; overflow-y:auto; font-size:10px; text-align:left; line-height:1.5;">
+      <table class="history-table" style="margin-bottom:8px;">
+        <thead><tr><th>WINNING SITUATION</th><th>POINTS</th><th>PAYER</th></tr></thead>
+        <tbody>
+          <tr><td>Normal Win (通常上がり)</td><td>1 pt / card</td><td>All Players</td></tr>
+          <tr><td>Normal Dobon (通常ドボン)</td><td>2 pts / card</td><td>Discarder</td></tr>
+          <tr><td>Dobon against Last Card</td><td>Fixed 20 pts</td><td>Discarder</td></tr>
+          <tr><td>Dobon-Gaeshi (ドボン返し)</td><td>Fixed 20 pts</td><td>Dobon-Discarder</td></tr>
+          <tr><td>Two "A"s Dobon (A2枚ドボン)</td><td>Fixed 20 pts</td><td>Discarder</td></tr>
+          <tr><td>Tenho (天和配牌ドボン)</td><td>20 pts / each</td><td>All Players</td></tr>
+          <tr><td>Normal Pon-Dobon</td><td>4 pts / card</td><td>Discarder</td></tr>
+          <tr><td>"2" Pon-Dobon (2ポンドボン)</td><td>Fixed 80 pts</td><td>"2" Discarder</td></tr>
+          <tr><td>Normal Kan-Dobon</td><td>8 pts / card</td><td>Discarder</td></tr>
+          <tr><td>"2" Kan-Dobon (2カンドボン)</td><td>Fixed 160 pts</td><td>"2" Discarder</td></tr>
+          <tr><td>Chombo (チョンボ反則)</td><td>5 pts / each</td><td>Offender</td></tr>
+        </tbody>
+      </table>
+      <div style="color:var(--gold); font-weight:bold; margin-bottom:2px;">Special Rules:</div>
+      <div>・「2」は残った場合、カード2枚分として数える</div>
+      <div>・「8」がある場合、手札全体の合計枚数を2倍（2枚で4倍）</div>
+      <div>・チョンボ／流局（Nagare）発生時、次のゲームの全点数は2倍（累積倍々）</div>
+      <div>・ドボンされた人は出した札を手札に戻してから枚数を計算</div>
+    </div>
+    <button class="modal-btn" style="margin-top:8px;" onclick="closePayoutModal()">CLOSE</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="championship-modal" style="display:none;">
   <div class="modal-content">
     <h2 style="margin:2px 0 8px; color:var(--gold); font-family:Georgia, serif;">★ CHAMPIONSHIP RESULT ★</h2>
@@ -506,7 +477,6 @@
   </div>
 </div>
 
-<!-- 履歴モーダル -->
 <div class="modal-overlay" id="history-modal" style="display:none;">
   <div class="modal-content" style="max-width:96%; width:440px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">CHAMPIONSHIP HISTORY</h3>

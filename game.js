@@ -5,8 +5,8 @@ const I18N = {
     ready: '準備完了', yourTurn: 'あなたの番です', cpuThinking: '思考中...',
     dirCCW: '反時計回り', dirCW: '時計回り', chooseSuit: '指定マークを選択',
     lblPlayers: '参加人数:', lblChombo: '判定モード:', lblTimer: '制限時間:',
-    chomboWrongLast: '手札が2枚ではないのに「LAST」状態でカードを出しました（チョンボ）',
-    chomboMissLast: '「LAST」未宣言のまま次のプレイヤーの手番に進みました（チョンボ）',
+    chomboWrongLast: '手札が3枚以上あるのに「LAST」状態でカードを出しました（チョンボ）',
+    chomboMissLast: '「LAST」未宣言のまま次の手番に進んだか、上がろうとしました（チョンボ）',
     timeoutMsg: '制限時間以内に行動しませんでした（時間切れチョンボ）',
     skipChomboPrompt: '上がり禁止ペナルティを解除しました (-10pt)',
     savedMsg: 'ゲーム状態を保存しました。',
@@ -21,8 +21,8 @@ const I18N = {
     ready: 'READY', yourTurn: 'Your Turn', cpuThinking: 'Thinking...',
     dirCCW: 'Counter-Clockwise', dirCW: 'Clockwise', chooseSuit: 'SELECT SUIT',
     lblPlayers: 'PLAYERS:', lblChombo: 'RULE MODE:', lblTimer: 'TIME LIMIT:',
-    chomboWrongLast: 'Played while LAST was active with invalid hand count (Chombo)',
-    chomboMissLast: 'Failed to declare LAST before next player moved (Chombo)',
+    chomboWrongLast: 'Played while LAST was active with 3 or more cards (Chombo)',
+    chomboMissLast: 'Failed to declare LAST before proceeding or finishing (Chombo)',
     timeoutMsg: 'Did not play within time limit (Timeout Chombo)',
     skipChomboPrompt: 'Lifted win-ban penalty (-10pt applied)',
     savedMsg: 'Game progress has been saved.',
@@ -53,7 +53,7 @@ const PHOTO_CARDS = {
   '♣_J': 'clubJ.jpg', '♣_Q': 'clubQ.jpg', '♣_K': 'clubK.jpg'
 };
 
-let numPlayers = 4, chomboMode = 'strict', userTimeLimit = 0; // デフォルト無制限
+let numPlayers = 4, chomboMode = 'strict', userTimeLimit = 0;
 let players = [], deck = [], discardHistory = [], lastActionDiscard = null;
 let turnIndex = 0, direction = -1, currentRound = 1, currentSet = 1;
 let roundMultiplier = 1, drawTwoStack = 0, designatedSuit = null;
@@ -61,6 +61,7 @@ let isGameOver = false, turnTimer = null, remainingTime = 0;
 let setScoreHistory = [];
 let activeNakiType = null, selectedIndices = [], nextRoundStarter = 0;
 let pendingLastCheck = false;
+let userLastWarningCount = 0; // ラスト押し忘れ1回目免除用
 
 // ドボン返し猶予管理
 let dobonStandbyTimer = null, dobonStandbySec = 10, pendingDobonData = null;
@@ -110,7 +111,6 @@ function speakVoice(text) {
   window.speechSynthesis.speak(uttr);
 }
 
-// 画面エフェクト
 function triggerFlash() {
   const f = document.getElementById('flash-overlay');
   if (f) { f.classList.add('active'); setTimeout(() => f.classList.remove('active'), 80); }
@@ -214,7 +214,7 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('resume-btn').style.display = 'block';
   }
 
-  // ★画面の他の場所をタップしたらカードが引っ込む（選択解除）★
+  // 画面の他の場所をタップしたらカードが引っ込む（選択解除）
   document.addEventListener('click', (e) => {
     if (isGameOver || pendingDobonData || activeNakiType !== null) return;
     if (!e.target.closest('.fan-card') && !e.target.closest('button') && !e.target.closest('.deck-3d-stack')) {
@@ -252,6 +252,7 @@ function startGame(isResume = false) {
 
   players = [];
   currentRound = 1; currentSet = 1;
+  userLastWarningCount = 0;
 
   const maleSvg = `<svg viewBox="0 0 24 24" width="28" height="28" fill="#555"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
   const femaleSvg = `<svg viewBox="0 0 24 24" width="28" height="28" fill="#555"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/><circle cx="12" cy="7" r="1.5" fill="#333"/></svg>`;
@@ -372,7 +373,6 @@ function updateUI() {
   const dirEl = document.getElementById('dir-display');
   if (dirEl) dirEl.innerText = direction === -1 ? I18N[currentLang].dirCCW : I18N[currentLang].dirCW;
   
-  // 8特大マーク表示
   const giantBox = document.getElementById('giant-suit-indicator');
   const giantSym = document.getElementById('giant-suit-symbol');
   if (giantBox && giantSym) {
@@ -407,7 +407,6 @@ function updateUI() {
   const discardSumEl = document.getElementById('discard-sum-val');
   if (discardSumEl) discardSumEl.innerText = lastActionDiscard ? lastActionDiscard.totalVal : 0;
 
-  // 相手CPU立ち上げ配置（ドボンアタッカー枠フラッシュ）
   const arcContainer = document.getElementById('cpu-arc-container');
   if (arcContainer) {
     arcContainer.innerHTML = '';
@@ -452,7 +451,7 @@ function updateUI() {
     }
   }
 
-  // ★プレイヤーのドボン判定（絶対に自動実行せず、ボタン発光＆手動待ち）★
+  // プレイヤーのドボン判定（★完全手動★）
   const user = players[0];
   const mySum = user ? user.hand.reduce((s, c) => s + c.val, 0) : 0;
   const targetVal = lastActionDiscard ? lastActionDiscard.totalVal : null;
@@ -460,9 +459,9 @@ function updateUI() {
 
   if (dobonBtn) {
     if (pendingDobonData && pendingDobonData.loser.id === 0) {
-      // プレイヤーがドボンされた側：ドボン返しチャンス！
+      // ドボン返しチャンス（手元に残っている手札の合計で判定）
       dobonBtn.innerText = 'DOBON-GAESHI';
-      if (mySum === targetVal) {
+      if (mySum === pendingDobonData.actionDiscard.totalVal) {
         dobonBtn.classList.add('gaeshi-mode');
       } else {
         dobonBtn.classList.remove('gaeshi-mode');
@@ -471,7 +470,7 @@ function updateUI() {
       dobonBtn.innerText = 'DOBON';
       dobonBtn.classList.remove('gaeshi-mode');
       if (!isGameOver && targetVal !== null && mySum === targetVal && user && user.hand.length > 0 && !user.bannedFromWin) {
-        dobonBtn.classList.add('ready'); // 金色脈動
+        dobonBtn.classList.add('ready');
       } else {
         dobonBtn.classList.remove('ready');
       }
@@ -490,7 +489,6 @@ function updateUI() {
   const userSumEl = document.getElementById('user-sum');
   if (userSumEl) userSumEl.innerText = mySum;
 
-  // 手札2段展開
   const userFanBox = document.getElementById('user-fan');
   if (userFanBox && user) {
     userFanBox.innerHTML = '';
@@ -536,7 +534,6 @@ function setMessage(msg) {
   if (el) el.innerText = msg;
 }
 
-// 打牌アニメーション
 function playCardWithHandAnimation(playerId, card, callback) {
   const unit = document.getElementById('flying-play-unit');
   const cardSlot = document.getElementById('flying-card-slot');
@@ -572,7 +569,6 @@ function playCardWithHandAnimation(playerId, card, callback) {
   }, 360);
 }
 
-// ドローアニメーション
 function playDrawAnimation(playerId, callback) {
   const c = document.getElementById('flying-draw-card');
   if (!c) { if (callback) callback(); return; }
@@ -598,7 +594,6 @@ function playDrawAnimation(playerId, callback) {
   setTimeout(() => { c.style.display = 'none'; if (callback) callback(); }, 360);
 }
 
-// タイマー
 function stopTimer() {
   if (turnTimer) { clearInterval(turnTimer); turnTimer = null; }
   const b = document.getElementById('timer-badge');
@@ -653,12 +648,35 @@ function onCardClick(index) {
   else { selectedIndices = [index]; updateUI(); }
 }
 
+// カードを出す処理（★ラストバグ完全修正版★）
 function playUserCard(index) {
   const card = players[0].hand[index];
   const top = discardHistory[discardHistory.length - 1];
 
-  if (players[0].declaredLast && players[0].hand.length !== 2) {
-    commitChombo(players[0], I18N[currentLang].chomboWrongLast); return;
+  // 【修正】手札3枚以上なのにLAST状態で出したらチョンボ
+  if (players[0].declaredLast && players[0].hand.length >= 3) {
+    commitChombo(players[0], I18N[currentLang].chomboWrongLast);
+    return;
+  }
+
+  // 【修正】手札2枚なのにLAST未宣言で出そうとした場合：1回目は警告して手元に戻す！
+  if (players[0].hand.length === 2 && !players[0].declaredLast && !pendingLastCheck) {
+    if (userLastWarningCount === 0) {
+      userLastWarningCount++;
+      alert('【警告】ラスト宣言を忘れています！先にLASTを押してから出してください（1回目は免除）');
+      selectedIndices = [];
+      updateUI();
+      return;
+    } else {
+      commitChombo(players[0], I18N[currentLang].chomboMissLast);
+      return;
+    }
+  }
+
+  // 【修正】手札1枚（最後の1枚）を出すとき：事前にLASTを宣言していなければチョンボ
+  if (players[0].hand.length === 1 && !players[0].declaredLast) {
+    commitChombo(players[0], I18N[currentLang].chomboMissLast);
+    return;
   }
 
   if (drawTwoStack > 0 && card.val !== 2) {
@@ -924,14 +942,16 @@ function handlePonKanEffects(cards, player) {
   passTurn(skips);
 }
 
-// プレイヤー手動ドボン・ドボン返し（自動発動は絶対にしない！）
+// プレイヤー手動ドボン・ドボン返し
 function triggerUserDobon() {
   if (isGameOver) return;
   const user = players[0];
 
   if (pendingDobonData && pendingDobonData.loser.id === 0) {
+    // 【修正】ドボン返し判定：手元に残っている手札の合計値だけで判定！
     const targetVal = pendingDobonData.actionDiscard.totalVal;
     const mySum = user.hand.reduce((s, c) => s + c.val, 0);
+
     if (mySum === targetVal) {
       speakVoice(currentLang === 'ja' ? 'ドボン返し！' : 'Counter Dobon!');
       clearDobonStandby();
@@ -943,6 +963,7 @@ function triggerUserDobon() {
     }
   }
 
+  // 通常のドボン
   speakVoice(currentLang === 'ja' ? 'ドボン！' : 'Dobon!');
 
   if (user.bannedFromWin) {
@@ -961,14 +982,9 @@ function triggerUserDobon() {
   }
 }
 
-// 10秒ドボン返し猶予タイマー
+// 10秒ドボン返し猶予タイマー（【修正】カードはまだ手札に戻さない！）
 function startDobonStandby(winner, loser, actionDiscard) {
   stopTimer();
-  if (actionDiscard.cards && !loser.returnedDiscard) {
-    actionDiscard.cards.forEach(c => loser.hand.push(c));
-    loser.returnedDiscard = true;
-  }
-
   pendingDobonData = { winner, loser, actionDiscard };
   dobonStandbySec = 10;
 
@@ -979,6 +995,7 @@ function startDobonStandby(winner, loser, actionDiscard) {
 
   updateUI();
 
+  // CPU側のドボン返し判定（手元の手札合計だけで判定）
   if (loser.id !== 0) {
     const lSum = loser.hand.reduce((s, c) => s + c.val, 0);
     if (lSum === actionDiscard.totalVal && !loser.bannedFromWin) {
@@ -1010,8 +1027,15 @@ function clearDobonStandby() {
   seats.forEach(s => s.classList.remove('dobon-attacker'));
 }
 
+// 通常ドボン確定（【修正】ここで初めて出した札を手札に戻して計算！）
 function finalizeNormalDobon(winner, loser, actionDiscard) {
   isGameOver = true;
+
+  // ルール準拠: ドボン確定時に初めて出したカードを手札に戻して枚数を数える
+  if (actionDiscard.cards) {
+    actionDiscard.cards.forEach(c => loser.hand.push(c));
+  }
+
   let points = 0;
   const loserCount = calculateSpecialHandCount(loser.hand);
 
@@ -1038,6 +1062,7 @@ function finalizeNormalDobon(winner, loser, actionDiscard) {
   pendingDobonData = null;
 }
 
+// ドボン返し成立処理（固定20点）
 function executeDobonGaeshiWin(winner, loser) {
   isGameOver = true;
   const points = 20 * roundMultiplier;

@@ -1,4 +1,4 @@
-// DOBON MASTER - Las Vegas VIP Lounge Engine (Tournament Edition with Dobon-Gaeshi)
+// DOBON MASTER - Las Vegas VIP Lounge Engine (Tournament Edition)
 
 const I18N = {
   ja: {
@@ -53,7 +53,7 @@ const PHOTO_CARDS = {
   '♣_J': 'clubJ.jpg', '♣_Q': 'clubQ.jpg', '♣_K': 'clubK.jpg'
 };
 
-let numPlayers = 4, chomboMode = 'strict', userTimeLimit = 10;
+let numPlayers = 4, chomboMode = 'strict', userTimeLimit = 0; // デフォルト無制限
 let players = [], deck = [], discardHistory = [], lastActionDiscard = null;
 let turnIndex = 0, direction = -1, currentRound = 1, currentSet = 1;
 let roundMultiplier = 1, drawTwoStack = 0, designatedSuit = null;
@@ -63,10 +63,8 @@ let activeNakiType = null, selectedIndices = [], nextRoundStarter = 0;
 let pendingLastCheck = false;
 
 // ドボン返し猶予管理
-let dobonStandbyTimer = null;
-let dobonStandbySec = 10;
-let pendingDobonData = null; // { winner, loser, actionDiscard, isGaeshi }
-let consecutivePassCount = 0; // 一周流局判定用
+let dobonStandbyTimer = null, dobonStandbySec = 10, pendingDobonData = null;
+let consecutivePassCount = 0;
 
 // Web Audio API
 let audioCtx = null;
@@ -115,9 +113,7 @@ function speakVoice(text) {
 // 画面エフェクト
 function triggerFlash() {
   const f = document.getElementById('flash-overlay');
-  if (!f) return;
-  f.classList.add('active');
-  setTimeout(() => f.classList.remove('active'), 80);
+  if (f) { f.classList.add('active'); setTimeout(() => f.classList.remove('active'), 80); }
 }
 
 function setBodyMood(mood) {
@@ -129,21 +125,15 @@ let confettiAnimationId = null;
 function startConfetti() {
   const canvas = document.getElementById('confetti-canvas');
   if (!canvas) return;
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
   canvas.style.display = 'block';
-  const ctx = canvas.getContext('2d');
-  const pieces = [];
+  const ctx = canvas.getContext('2d'), pieces = [];
   const colors = ['#f5cd79', '#e74c3c', '#2ecc71', '#3498db', '#9b59b6', '#ffffff'];
   for (let i = 0; i < 120; i++) {
     pieces.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * -canvas.height,
-      size: Math.random() * 9 + 5,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      speed: Math.random() * 5 + 3,
-      angle: Math.random() * 360,
-      rotation: Math.random() * 10 - 5
+      x: Math.random() * canvas.width, y: Math.random() * -canvas.height,
+      size: Math.random() * 9 + 5, color: colors[Math.floor(Math.random() * colors.length)],
+      speed: Math.random() * 5 + 3, angle: Math.random() * 360, rotation: Math.random() * 10 - 5
     });
   }
   function draw() {
@@ -157,13 +147,12 @@ function startConfetti() {
     });
     confettiAnimationId = requestAnimationFrame(draw);
   }
-  cancelAnimationFrame(confettiAnimationId);
-  draw();
+  cancelAnimationFrame(confettiAnimationId); draw();
 }
 
 function stopConfetti() {
-  const canvas = document.getElementById('confetti-canvas');
   cancelAnimationFrame(confettiAnimationId);
+  const canvas = document.getElementById('confetti-canvas');
   if (canvas) {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -194,15 +183,9 @@ function toggleLang() {
   updateUI();
 }
 
-// 点数表モーダル制御
-function openPayoutModal() {
-  document.getElementById('payout-modal').style.display = 'flex';
-}
-function closePayoutModal() {
-  document.getElementById('payout-modal').style.display = 'none';
-}
+function openPayoutModal() { document.getElementById('payout-modal').style.display = 'flex'; }
+function closePayoutModal() { document.getElementById('payout-modal').style.display = 'none'; }
 
-// 永続保存・再開・終了
 function suspendGame() {
   const save = {
     numPlayers, chomboMode, userTimeLimit, currentRound, currentSet, roundMultiplier,
@@ -230,6 +213,17 @@ window.addEventListener('DOMContentLoaded', () => {
   if (localStorage.getItem('dobon_save_data')) {
     document.getElementById('resume-btn').style.display = 'block';
   }
+
+  // ★画面の他の場所をタップしたらカードが引っ込む（選択解除）★
+  document.addEventListener('click', (e) => {
+    if (isGameOver || pendingDobonData || activeNakiType !== null) return;
+    if (!e.target.closest('.fan-card') && !e.target.closest('button') && !e.target.closest('.deck-3d-stack')) {
+      if (selectedIndices.length > 0) {
+        selectedIndices = [];
+        updateUI();
+      }
+    }
+  });
 });
 
 function resumeGame() {
@@ -378,6 +372,7 @@ function updateUI() {
   const dirEl = document.getElementById('dir-display');
   if (dirEl) dirEl.innerText = direction === -1 ? I18N[currentLang].dirCCW : I18N[currentLang].dirCW;
   
+  // 8特大マーク表示
   const giantBox = document.getElementById('giant-suit-indicator');
   const giantSym = document.getElementById('giant-suit-symbol');
   if (giantBox && giantSym) {
@@ -428,7 +423,6 @@ function updateUI() {
 
       let fanHtml = '<div class="cpu-fan-cards">';
       if (isGameOver || isAttacker) {
-        // WIN時やドボン宣言アタッカーはカードを大きく前面オープン！
         p.hand.forEach((c, cIdx) => {
           fanHtml += `<div style="position:absolute; left:${cIdx * 18}px; transform:scale(0.42); transform-origin:top left;">${renderCardHtml(c)}</div>`;
         });
@@ -458,7 +452,7 @@ function updateUI() {
     }
   }
 
-  // プレイヤーのドボン判定（★絶対に自動実行せず、ボタン発光＆手動待ち★）
+  // ★プレイヤーのドボン判定（絶対に自動実行せず、ボタン発光＆手動待ち）★
   const user = players[0];
   const mySum = user ? user.hand.reduce((s, c) => s + c.val, 0) : 0;
   const targetVal = lastActionDiscard ? lastActionDiscard.totalVal : null;
@@ -528,7 +522,10 @@ function updateUI() {
       cardEl.style.transform = `translate(${xOffset}px, ${yOffset + lift}px) rotate(${angle}deg)`;
       cardEl.style.zIndex = isSelected ? 90 : (rowClass === 'row-back' ? 30 + idx : 45 + idx);
       cardEl.innerHTML = renderCardHtml(card);
-      cardEl.onclick = () => onCardClick(idx);
+      cardEl.onclick = (e) => {
+        e.stopPropagation();
+        onCardClick(idx);
+      };
       userFanBox.appendChild(cardEl);
     });
   }
@@ -539,7 +536,7 @@ function setMessage(msg) {
   if (el) el.innerText = msg;
 }
 
-// アニメーション
+// 打牌アニメーション
 function playCardWithHandAnimation(playerId, card, callback) {
   const unit = document.getElementById('flying-play-unit');
   const cardSlot = document.getElementById('flying-card-slot');
@@ -575,6 +572,7 @@ function playCardWithHandAnimation(playerId, card, callback) {
   }, 360);
 }
 
+// ドローアニメーション
 function playDrawAnimation(playerId, callback) {
   const c = document.getElementById('flying-draw-card');
   if (!c) { if (callback) callback(); return; }
@@ -679,7 +677,7 @@ function playUserCard(index) {
     }
 
     stopTimer();
-    consecutivePassCount = 0; // 出せたので流局カウントリセット
+    consecutivePassCount = 0;
 
     if (players[0].hand.length === 2) {
       if (players[0].declaredLast) {
@@ -734,7 +732,6 @@ function postCardPlayEffect(card, player) {
     skipCount = 1; setMessage('Skip (A)');
   }
 
-  // CPUのみのドボン判定（★プレイヤーは絶対除外★）
   if (checkCpuInterrupts(card.val, player.id)) return;
 
   passTurn(skipCount);
@@ -769,7 +766,6 @@ function scheduleCpuTurn() {
   setTimeout(cpuTurn, delay);
 }
 
-// 山札ドロー
 function onDeckClick() {
   if (turnIndex !== 0 || isGameOver || pendingDobonData) return;
   stopTimer();
@@ -792,7 +788,7 @@ function onDeckClick() {
     }
     selectedIndices = []; updateUI();
     consecutivePassCount++;
-    checkNagare(); // 流局判定
+    checkNagare();
     passTurn(0);
   });
 }
@@ -810,10 +806,8 @@ function drawCard(player) {
   if (deck.length > 0) player.hand.push(deck.pop());
 }
 
-// 流局（Nagare）判定：全員が引いて出せないで一周した、または誰も上がれない場合
 function checkNagare() {
   if (consecutivePassCount >= numPlayers * 2) {
-    // 流局成立！次回倍率2倍（累積）
     isGameOver = true; stopTimer(); clearDobonStandby();
     roundMultiplier *= 2;
     showResultModal('NAGARE (流局)', `全員が出せないまま一周流局しました。<br>次ゲームの得点倍率は <b>${roundMultiplier}x</b> に累積されます！`);
@@ -930,13 +924,12 @@ function handlePonKanEffects(cards, player) {
   passTurn(skips);
 }
 
-// プレイヤー手動ドボン・ドボン返し
+// プレイヤー手動ドボン・ドボン返し（自動発動は絶対にしない！）
 function triggerUserDobon() {
   if (isGameOver) return;
   const user = players[0];
 
   if (pendingDobonData && pendingDobonData.loser.id === 0) {
-    // ★ドボン返し発動！★
     const targetVal = pendingDobonData.actionDiscard.totalVal;
     const mySum = user.hand.reduce((s, c) => s + c.val, 0);
     if (mySum === targetVal) {
@@ -950,7 +943,6 @@ function triggerUserDobon() {
     }
   }
 
-  // 通常の自発的ドボン
   speakVoice(currentLang === 'ja' ? 'ドボン！' : 'Dobon!');
 
   if (user.bannedFromWin) {
@@ -963,17 +955,15 @@ function triggerUserDobon() {
   if (targetVal !== null && mySum === targetVal && user.hand.length > 0) {
     stopTimer();
     const loser = players[lastActionDiscard.playerId] || players[(user.id - direction + numPlayers) % numPlayers];
-    // 相手へのドボン返し猶予を開始
     startDobonStandby(user, loser, lastActionDiscard);
   } else {
     commitChombo(user, `Hand sum (${mySum}) does not match discard (${targetVal})`);
   }
 }
 
-// 10秒ドボン返し猶予タイマーの開始
+// 10秒ドボン返し猶予タイマー
 function startDobonStandby(winner, loser, actionDiscard) {
   stopTimer();
-  // ルール準拠: ドボンされた人は出したカードを手札に戻す
   if (actionDiscard.cards && !loser.returnedDiscard) {
     actionDiscard.cards.forEach(c => loser.hand.push(c));
     loser.returnedDiscard = true;
@@ -989,7 +979,6 @@ function startDobonStandby(winner, loser, actionDiscard) {
 
   updateUI();
 
-  // CPUがドボンされた側の場合の自動ドボン返し判定
   if (loser.id !== 0) {
     const lSum = loser.hand.reduce((s, c) => s + c.val, 0);
     if (lSum === actionDiscard.totalVal && !loser.bannedFromWin) {
@@ -999,7 +988,7 @@ function startDobonStandby(winner, loser, actionDiscard) {
           clearDobonStandby();
           executeDobonGaeshiWin(loser, winner);
         }
-      }, 3500); // 3.5秒後にCPUがドボン返し
+      }, 3500);
     }
   }
 
@@ -1008,7 +997,6 @@ function startDobonStandby(winner, loser, actionDiscard) {
     if (countEl) countEl.innerText = `${dobonStandbySec}`;
     if (dobonStandbySec <= 0) {
       clearDobonStandby();
-      // 10秒経過してドボン返しなし -> 元のドボン確定
       finalizeNormalDobon(pendingDobonData.winner, pendingDobonData.loser, pendingDobonData.actionDiscard);
     }
   }, 1000);
@@ -1022,7 +1010,6 @@ function clearDobonStandby() {
   seats.forEach(s => s.classList.remove('dobon-attacker'));
 }
 
-// 通常ドボン確定処理
 function finalizeNormalDobon(winner, loser, actionDiscard) {
   isGameOver = true;
   let points = 0;
@@ -1051,10 +1038,9 @@ function finalizeNormalDobon(winner, loser, actionDiscard) {
   pendingDobonData = null;
 }
 
-// ドボン返し成立処理（Fixed 20 pts）
 function executeDobonGaeshiWin(winner, loser) {
   isGameOver = true;
-  const points = 20 * roundMultiplier; // ルールブック準拠: 固定20点
+  const points = 20 * roundMultiplier;
 
   const deltas = players.map(p => (p.id === winner.id ? points : (p.id === loser.id ? -points : 0)));
   winner.score += points; loser.score -= points;
@@ -1247,7 +1233,6 @@ function checkCpuInterrupts(targetVal, playedPlayerId) {
   if (isGameOver || pendingDobonData) return false;
 
   for (let p of players) {
-    // プレイヤー（0）と直前にカードを出した人は判定から除外！
     if (p.id === 0 || p.id === playedPlayerId || p.bannedFromWin) continue;
 
     if (p.hand.reduce((s, c) => s + c.val, 0) === targetVal && p.hand.length > 0) {
@@ -1258,7 +1243,7 @@ function checkCpuInterrupts(targetVal, playedPlayerId) {
           startDobonStandby(p, loser, lastActionDiscard);
         }
       }, 500);
-      return true; // CPUドボン発生
+      return true;
     }
   }
   return false;

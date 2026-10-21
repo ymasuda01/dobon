@@ -5,7 +5,7 @@ const I18N = {
     ready: '準備完了', yourTurn: 'あなたの番です', cpuThinking: '思考中...',
     dirCCW: '反時計回り', dirCW: '時計回り', chooseSuit: '指定マークを選択',
     lblPlayers: '参加人数:', lblChombo: '判定モード:', lblTimer: '制限時間:',
-    chomboWrongLast: '手札が2枚ではないのに「LAST」状態でカードを出しました（チョンボ）',
+    chomboWrongLast: '手札が3枚以上あるのに「LAST」状態でカードを出しました（チョンボ）',
     chomboMissLast: '「LAST」未宣言のまま次のプレイヤーの手番に進みました（チョンボ）',
     timeoutMsg: '制限時間以内に行動しませんでした（時間切れチョンボ）',
     skipChomboPrompt: '上がり禁止ペナルティを解除しました (-10pt)',
@@ -21,7 +21,7 @@ const I18N = {
     ready: 'READY', yourTurn: 'Your Turn', cpuThinking: 'Thinking...',
     dirCCW: 'Counter-Clockwise', dirCW: 'Clockwise', chooseSuit: 'SELECT SUIT',
     lblPlayers: 'PLAYERS:', lblChombo: 'RULE MODE:', lblTimer: 'TIME LIMIT:',
-    chomboWrongLast: 'Played while LAST was active with invalid hand count (Chombo)',
+    chomboWrongLast: 'Played while LAST was active with 3 or more cards (Chombo)',
     chomboMissLast: 'Failed to declare LAST before next player moved (Chombo)',
     timeoutMsg: 'Did not play within time limit (Timeout Chombo)',
     skipChomboPrompt: 'Lifted win-ban penalty (-10pt applied)',
@@ -106,7 +106,7 @@ function speakVoice(text) {
   window.speechSynthesis.speak(uttr);
 }
 
-// 画面エフェクト（フラッシュ、雰囲気暗転、紙吹雪）
+// 画面演出
 function triggerFlash() {
   const f = document.getElementById('flash-overlay');
   if (!f) return;
@@ -119,55 +119,67 @@ function setBodyMood(mood) {
   if (mood) document.body.classList.add(mood);
 }
 
-// 紙吹雪（Confetti）エンジン
-let confettiAnimationId = null;
-function startConfetti() {
+// 噴水キャノン型コンフェッティ物理シミュレーション
+let confettiAnimId = null;
+function startFountainConfetti() {
   const canvas = document.getElementById('confetti-canvas');
   if (!canvas) return;
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
   canvas.style.display = 'block';
   const ctx = canvas.getContext('2d');
-  const pieces = [];
-  const colors = ['#f5cd79', '#e74c3c', '#2ecc71', '#3498db', '#9b59b6', '#ffffff'];
-  for (let i = 0; i < 120; i++) {
-    pieces.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * -canvas.height,
-      size: Math.random() * 9 + 5,
+  const particles = [];
+  const colors = ['#f5cd79', '#ffd700', '#e74c3c', '#2ecc71', '#3498db', '#9b59b6', '#ffffff'];
+
+  // 中央下部から上空へ吹き出す粒子
+  for (let i = 0; i < 140; i++) {
+    const angle = (Math.random() * 70 + 55) * (Math.PI / 180); // 55〜125度（上方向）
+    const speed = Math.random() * 12 + 10;
+    particles.push({
+      x: canvas.width / 2 + (Math.random() * 40 - 20),
+      y: canvas.height * 0.65,
+      vx: Math.cos(angle) * (Math.random() > 0.5 ? 1 : -1) * speed * 0.7,
+      vy: -Math.sin(angle) * speed,
+      size: Math.random() * 8 + 5,
       color: colors[Math.floor(Math.random() * colors.length)],
-      speed: Math.random() * 5 + 3,
-      angle: Math.random() * 360,
-      rotation: Math.random() * 10 - 5
+      rotation: Math.random() * 360,
+      rotSpeed: Math.random() * 10 - 5,
+      gravity: 0.32
     });
   }
-  function draw() {
+
+  function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    pieces.forEach(p => {
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += p.gravity;
+      p.vx *= 0.99;
+      p.rotation += p.rotSpeed;
+
       ctx.save();
       ctx.translate(p.x, p.y);
-      ctx.rotate((p.angle * Math.PI) / 180);
+      ctx.rotate((p.rotation * Math.PI) / 180);
       ctx.fillStyle = p.color;
       ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
       ctx.restore();
-      p.y += p.speed;
-      p.angle += p.rotation;
-      if (p.y > canvas.height) p.y = -20;
     });
-    confettiAnimationId = requestAnimationFrame(draw);
+    confettiAnimId = requestAnimationFrame(render);
   }
-  cancelAnimationFrame(confettiAnimationId);
-  draw();
+  cancelAnimationFrame(confettiAnimId);
+  render();
 }
 
 function stopConfetti() {
   const canvas = document.getElementById('confetti-canvas');
-  cancelAnimationFrame(confettiAnimationId);
+  cancelAnimationFrame(confettiAnimId);
   if (canvas) {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     canvas.style.display = 'none';
   }
+  const banner = document.getElementById('winner-jackpot-banner');
+  if (banner) banner.classList.remove('show');
 }
 
 function createDeck52() {
@@ -314,7 +326,7 @@ function skipChomboRound() {
 function renderRealPips(card) {
   const suit = card.suit;
   const positions = {
-    1: [[50, 50, false, true]], // [x%, y%, flip, centerHuge]
+    1: [[50, 50, false, true]],
     2: [[50, 24, false], [50, 76, true]],
     3: [[50, 24, false], [50, 50, false], [50, 76, true]],
     4: [[30, 24, false], [70, 24, false], [30, 76, true], [70, 76, true]],
@@ -362,7 +374,7 @@ function updateUI() {
   const dirEl = document.getElementById('dir-display');
   if (dirEl) dirEl.innerText = direction === -1 ? I18N[currentLang].dirCCW : I18N[currentLang].dirCW;
   
-  // 8特大マーク表示
+  // 8特大マーク表示（手前HUD）
   const giantBox = document.getElementById('giant-suit-indicator');
   const giantSym = document.getElementById('giant-suit-symbol');
   if (giantBox && giantSym) {
@@ -397,7 +409,7 @@ function updateUI() {
   const discardSumEl = document.getElementById('discard-sum-val');
   if (discardSumEl) discardSumEl.innerText = lastActionDiscard ? lastActionDiscard.totalVal : 0;
 
-  // 相手CPU立ち上げ配置（rotateX(-46deg)）
+  // 相手CPU立ち上げ配置
   const arcContainer = document.getElementById('cpu-arc-container');
   if (arcContainer) {
     arcContainer.innerHTML = '';
@@ -412,7 +424,6 @@ function updateUI() {
 
       let fanHtml = '<div class="cpu-fan-cards">';
       if (isGameOver) {
-        // WIN時は他人の手札も全開示
         p.hand.forEach((c, cIdx) => {
           fanHtml += `<div style="position:absolute; left:${cIdx * 18}px; transform:scale(0.42); transform-origin:top left;">${renderCardHtml(c)}</div>`;
         });
@@ -424,7 +435,7 @@ function updateUI() {
           fanHtml += `<div class="cpu-fan-card" style="transform: translate(${xOff}px, 0) rotate(${rot}deg);"></div>`;
         }
       }
-      fanHtml += `<img class="cpu-hand-img" src="opponent.png" alt="Hand"></div>`;
+      fanHtml += `<img class="cpu-hand-img" src="opponent.png" alt="" onerror="this.style.display='none'"></div>`;
 
       seat.innerHTML = `
         <div class="cpu-billboard-stand">
@@ -442,14 +453,14 @@ function updateUI() {
     }
   }
 
-  // ドボンボタンの手動発動インジケータ（自動発動は絶対にしない！）
+  // ドボンボタンの手動発動インジケータ（自動では絶対に上がらない！）
   const user = players[0];
   const mySum = user ? user.hand.reduce((s, c) => s + c.val, 0) : 0;
   const targetVal = lastActionDiscard ? lastActionDiscard.totalVal : null;
   const dobonBtn = document.getElementById('dobon-btn');
   if (dobonBtn) {
     if (!isGameOver && targetVal !== null && mySum === targetVal && user && user.hand.length > 0 && !user.bannedFromWin) {
-      dobonBtn.classList.add('ready'); // 金色に鼓動
+      dobonBtn.classList.add('ready'); // 金色に脈動
     } else {
       dobonBtn.classList.remove('ready');
     }
@@ -473,7 +484,7 @@ function updateUI() {
   if (userFanBox && user) {
     userFanBox.innerHTML = '';
     const total = user.hand.length;
-    const isTwoRows = total > 8; // 8枚超えたら2段化
+    const isTwoRows = total > 8;
 
     user.hand.forEach((card, idx) => {
       const isSelected = selectedIndices.includes(idx);
@@ -522,7 +533,7 @@ function playCardWithHandAnimation(playerId, card, callback) {
   unit.style.display = 'block'; unit.style.opacity = '1';
 
   let sX = window.innerWidth / 2, sY = window.innerHeight * 0.82;
-  let eX = window.innerWidth / 2, eY = window.innerHeight * 0.45;
+  let eX = window.innerWidth / 2, eY = window.innerHeight * 0.44;
 
   if (playerId === 0) {
     handImg.style.transform = 'scaleX(-1) rotate(-15deg)';
@@ -552,7 +563,7 @@ function playDrawAnimation(playerId, callback) {
   const c = document.getElementById('flying-draw-card');
   if (!c) { if (callback) callback(); return; }
   c.style.display = 'block';
-  const dX = window.innerWidth / 2 - 60, dY = window.innerHeight * 0.45;
+  const dX = window.innerWidth / 2 - 60, dY = window.innerHeight * 0.44;
   let tX = window.innerWidth / 2, tY = window.innerHeight * 0.82;
 
   if (playerId !== 0) {
@@ -575,7 +586,7 @@ function playDrawAnimation(playerId, callback) {
 
 function stopTimer() {
   if (turnTimer) { clearInterval(turnTimer); turnTimer = null; }
-  const b = document.getElementById('timer-badge');
+  const b = document.getElementById('timer-badge-heartbeat');
   if (b) b.classList.remove('urgent');
   const s = document.getElementById('timer-sec');
   if (s) s.innerText = '--';
@@ -602,7 +613,7 @@ function updateTimerDisplay() {
   const s = document.getElementById('timer-sec');
   if (s) s.innerText = `${remainingTime}s`;
   const t = (userTimeLimit === 5) ? 3 : 5;
-  const b = document.getElementById('timer-badge');
+  const b = document.getElementById('timer-badge-heartbeat');
   if (b) {
     if (remainingTime <= t) b.classList.add('urgent');
     else b.classList.remove('urgent');
@@ -631,7 +642,9 @@ function playUserCard(index) {
   const card = players[0].hand[index];
   const top = discardHistory[discardHistory.length - 1];
 
-  if (players[0].declaredLast && players[0].hand.length !== 2) {
+  // ★ラスト判定バグ修正★
+  // 手札が3枚以上あるのにLASTが点灯したまま出したらチョンボ
+  if (players[0].declaredLast && players[0].hand.length >= 3) {
     commitChombo(players[0], I18N[currentLang].chomboWrongLast); return;
   }
 
@@ -652,10 +665,12 @@ function playUserCard(index) {
 
     stopTimer();
 
+    // 手札2枚から出して残り1枚になる瞬間
     if (players[0].hand.length === 2) {
       if (players[0].declaredLast) {
         speakVoice(currentLang === 'ja' ? 'ラスト！' : 'Last!');
       } else {
+        // 事前未宣言の場合：事後猶予フラグをON
         pendingLastCheck = true;
       }
     }
@@ -667,7 +682,6 @@ function playUserCard(index) {
       lastActionDiscard = { cards: [card], totalVal: card.val, playerId: 0 };
 
       if (card.val === 8) {
-        // 手札が見える明るいフロートUIを表示
         document.getElementById('suit-select-floating').style.display = 'block';
         return;
       }
@@ -689,10 +703,12 @@ function selectSuit(suit) {
 function postCardPlayEffect(card, player) {
   updateUI();
 
+  // ★通常上がり判定★
   if (player.hand.length === 0) {
     if (player.bannedFromWin) {
       commitChombo(player, 'Attempted to win while win-banned'); return;
     }
+    // 手札1枚からラスト点灯のまま最後のカードを出してゲームセット（完全勝利！）
     endRoundNormalWin(player); return;
   }
 
@@ -729,6 +745,7 @@ function passTurn(skips = 0) {
     startTimerWithDuration(userTimeLimit, handleUserTimeout);
   } else {
     setMessage(`${players[turnIndex].name} ${I18N[currentLang].cpuThinking}`);
+    // プレイヤーが事後猶予中の場合は必ず5秒以上の猶予を与える
     const delay = pendingLastCheck ? 5200 : Math.floor(Math.random() * (4000 - 1500 + 1)) + 1500;
     setTimeout(cpuTurn, delay);
   }
@@ -743,6 +760,7 @@ function onDeckClick() {
   if (turnIndex !== 0 || isGameOver) return;
   stopTimer();
 
+  // 引いた場合は自動でLAST解除
   if (players[0].declaredLast) {
     players[0].declaredLast = false;
     document.getElementById('last-btn').classList.remove('active', 'urgent');
@@ -776,6 +794,7 @@ function drawCard(player) {
   if (deck.length > 0) player.hand.push(deck.pop());
 }
 
+// LASTボタン（トグル・事後猶予セーフ）
 function toggleUserLast() {
   players[0].declaredLast = !players[0].declaredLast;
   const btn = document.getElementById('last-btn');
@@ -795,6 +814,7 @@ function toggleUserLast() {
   }
 }
 
+// ポン・カン
 function startNakiMode(type) {
   if (isGameOver) return;
   activeNakiType = type; selectedIndices = [];
@@ -927,13 +947,14 @@ function executeDobonWin(winner, actionDiscard) {
 
   recordRoundHistory('DOBON', deltas);
   roundMultiplier = 1; nextRoundStarter = winner.id;
-  updateUI(); // 他人の手札全開示
+  updateUI();
 
   if (winner.id === 0) {
-    startConfetti(); // プレイヤー勝利で紙吹雪
+    document.getElementById('winner-jackpot-banner').classList.add('show');
+    startFountainConfetti(); // 噴水キャノン紙吹雪
     setBodyMood(null);
   } else if (loser.id === 0) {
-    setBodyMood('mood-disaster'); // 被ドボンで激震・暗転
+    setBodyMood('mood-disaster'); // 被ドボンで激震・彩度保持の不穏影
   } else {
     setBodyMood('mood-defeat');
   }
@@ -972,10 +993,11 @@ function endRoundNormalWin(winner) {
   updateUI();
 
   if (winner.id === 0) {
-    startConfetti();
+    document.getElementById('winner-jackpot-banner').classList.add('show');
+    startFountainConfetti();
     setBodyMood(null);
   } else {
-    setBodyMood('mood-defeat'); // 他人上がりでどんより
+    setBodyMood('mood-defeat');
   }
 
   showResultModal(`${winner.name} WIN!`, `${detailHtml}<b>Winner: +${totalWin}pt</b>`);
@@ -1001,7 +1023,7 @@ function commitChombo(offender, reason) {
   roundMultiplier *= 2; nextRoundStarter = offender.id;
   updateUI();
 
-  if (offender.id === 0) setBodyMood('mood-disaster'); // 自分がチョンボで激震・暗転
+  if (offender.id === 0) setBodyMood('mood-disaster'); // 自分のチョンボで激震
   else setBodyMood('mood-defeat');
 
   showResultModal('CHOMBO!', `<b>Offender: ${offender.name} (-${totalFine}pt)</b><br>${reason}<br>* Multiplier: ${roundMultiplier}x`);
@@ -1022,7 +1044,10 @@ function checkTenho() {
       p.score += winPts; deltas[p.id] = winPts;
       recordRoundHistory('TENHO', deltas);
       updateUI();
-      if (p.id === 0) startConfetti();
+      if (p.id === 0) {
+        document.getElementById('winner-jackpot-banner').classList.add('show');
+        startFountainConfetti();
+      }
       showResultModal('TENHO DOBON!', `<b>${p.name}: +${winPts}pt</b>`);
       return;
     }
@@ -1034,6 +1059,7 @@ function cpuTurn() {
   const cpu = players[turnIndex];
   const top = discardHistory[discardHistory.length - 1];
 
+  // 次のCPUが行動を開始した時点で、プレイヤーが事後猶予中にLASTを押していなかったらチョンボ！
   if (pendingLastCheck && !players[0].declaredLast) {
     pendingLastCheck = false;
     commitChombo(players[0], I18N[currentLang].chomboMissLast);

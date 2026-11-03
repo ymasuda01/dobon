@@ -363,7 +363,7 @@
   <div style="display:flex; gap:5px; align-items:center;">
     <button class="header-btn" onclick="toggleLang()" id="lang-btn">EN</button>
     <button class="header-btn" onclick="openPayoutModal()">PAYOUT</button>
-    <button class="header-btn" id="net-status-btn" onclick="openOnlineRoomModal()">📶 CONNECTING...</button>
+    <button class="header-btn" id="net-status-btn" onclick="document.getElementById('online-room-modal').style.display='flex'">📶 CONNECTING...</button>
     <button class="header-btn" onclick="suspendGame()">SAVE & QUIT</button>
     <button class="header-btn" style="border-color:#e74c3c; color:#ff7675;" onclick="quitToTitle()">QUIT</button>
     <div>R<span id="round-num" style="color:var(--gold); font-weight:bold;">1</span> <span class="mult-tag" id="multiplier-display">1x</span></div>

@@ -385,14 +385,32 @@ window.addEventListener('DOMContentLoaded', () => {
         if (userTimeLimit > 0) startTimerWithDuration(userTimeLimit, handleUserTimeout);
       });
     });
+    // ★サーバーから本物のカードが届いた時（自分が引いた側）★
+    socket.on('my_card_drawn', (data) => {
+      data.cards.forEach(card => {
+        players[0].hand.push(card);
+      });
+      document.getElementById('deck-count').innerText = data.deckCount;
+      drawTwoStack = 0;
+      selectedIndices = [];
+      updateUI();
+      consecutivePassCount++;
+      checkNagare();
+      passTurn(0); // 相手の番へ交代
+    });
 
-    // ★相手が山札から引いた時の同期受信★
-    socket.on('card_drawn_sync', () => {
+    // 相手が山札を引いた時を受信（相手側）
+    socket.on('card_drawn_sync', (data) => {
       if (!isOnlineMatch) return;
       playDrawAnimation(1, () => {
-        if (players[1]) players[1].hand.push(null);
+        if (players[1]) {
+          for (let i = 0; i < data.drawCount; i++) {
+            players[1].hand.push(null); // 相手の手札枚数を増やす（裏面）
+          }
+        }
+        document.getElementById('deck-count').innerText = data.deckCount;
         drawTwoStack = 0;
-        turnIndex = 0;
+        turnIndex = 0; // 自分の番へ
         updateUI();
         setMessage('相手が山札を引きました。あなたの番です！');
         if (userTimeLimit > 0) startTimerWithDuration(userTimeLimit, handleUserTimeout);
@@ -1049,11 +1067,18 @@ function onDeckClick() {
   }
   pendingLastCheck = false;
 
-  playDrawAnimation(0, () => {
-    if (isOnlineMatch && socket && currentRoomId) {
-      socket.emit('draw_card', { roomId: currentRoomId });
-    }
+  const countToDraw = drawTwoStack > 0 ? drawTwoStack : 1;
 
+  // ★オンライン対戦時はサーバーにカードを請求する★
+  if (isOnlineMatch && socket && currentRoomId) {
+    playDrawAnimation(0, () => {
+      socket.emit('draw_card', { roomId: currentRoomId, count: countToDraw });
+    });
+    return;
+  }
+
+  // 一人プレイ（CPU戦）のときの通常処理
+  playDrawAnimation(0, () => {
     if (drawTwoStack > 0) {
       for (let i = 0; i < drawTwoStack; i++) drawCard(players[0]);
       setMessage(I18N[currentLang].drewCards.replace('{count}', drawTwoStack));
@@ -1068,7 +1093,6 @@ function onDeckClick() {
     passTurn(0);
   });
 }
-
 function drawCard(player) {
   if (deck.length === 0) {
     const top = discardHistory.pop();

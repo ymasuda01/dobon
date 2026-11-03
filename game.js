@@ -1,4 +1,4 @@
-// DOBON MASTER - Las Vegas VIP Lounge Engine (Tournament Edition)
+// DOBON MASTER - Las Vegas VIP Lounge Engine (Tournament Edition with Pon-Dobon)
 
 const I18N = {
   ja: {
@@ -55,7 +55,7 @@ const PHOTO_CARDS = {
   '♣_J': 'clubJ.jpg', '♣_Q': 'clubQ.jpg', '♣_K': 'clubK.jpg'
 };
 
-let numPlayers = 4, chomboMode = 'strict', userTimeLimit = 0; // デフォルト無制限
+let numPlayers = 4, chomboMode = 'strict', userTimeLimit = 0;
 let players = [], deck = [], discardHistory = [], lastActionDiscard = null;
 let turnIndex = 0, direction = -1, currentRound = 1, currentSet = 1;
 let roundMultiplier = 1, drawTwoStack = 0, designatedSuit = null;
@@ -63,7 +63,9 @@ let isGameOver = false, turnTimer = null, remainingTime = 0;
 let setScoreHistory = [];
 let activeNakiType = null, selectedIndices = [], nextRoundStarter = 0;
 let pendingLastCheck = false;
-let userLastWarningCount = 0; // ラスト押し忘れ1回目免除用
+let userLastWarningCount = 0;
+
+let testModeType = null; // 'test_pon3' or 'test_pon2'
 
 // ドボン返し猶予管理
 let dobonStandbyTimer = null, dobonStandbySec = 10, pendingDobonData = null;
@@ -118,7 +120,11 @@ function triggerFlash() {
   if (f) { f.classList.add('active'); setTimeout(() => f.classList.remove('active'), 80); }
 }
 
-// 画面中央からパーンと広がり、重力で落ちてくるConfetti
+function setBodyMood(mood) {
+  document.body.classList.remove('mood-defeat', 'mood-disaster');
+  if (mood) document.body.classList.add(mood);
+}
+
 let confettiAnimationId = null;
 function startConfetti() {
   const canvas = document.getElementById('confetti-canvas');
@@ -136,7 +142,7 @@ function startConfetti() {
     pieces.push({
       x: centerX, y: centerY,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 4, // 上方向へ打ち上げ
+      vy: Math.sin(angle) * speed - 4,
       size: Math.random() * 9 + 5,
       color: colors[Math.floor(Math.random() * colors.length)],
       rotation: Math.random() * 360,
@@ -174,7 +180,6 @@ function stopConfetti() {
   }
 }
 
-// 勝敗テロップ演出（WINNER!で花火Confetti / LOSE...で激震）
 function showOutcomeBanner(isWin) {
   const b = document.getElementById('round-outcome-banner');
   if (!b) return;
@@ -249,7 +254,22 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('resume-btn').style.display = 'block';
   }
 
-  // 画面の他の場所をタップしたらカードが引っ込む（選択解除）
+  // スタートモーダルのセレクトボックスにテストモードを自動注入
+  const sel = document.getElementById('player-count-select');
+  if (sel && !document.getElementById('opt-test-pon3')) {
+    const opt1 = document.createElement('option');
+    opt1.id = 'opt-test-pon3';
+    opt1.value = 'test_pon3';
+    opt1.innerText = '【TEST】Pon-Dobon (3の2枚ポン検証)';
+    sel.appendChild(opt1);
+
+    const opt2 = document.createElement('option');
+    opt2.id = 'opt-test-pon2';
+    opt2.value = 'test_pon2';
+    opt2.innerText = '【TEST】"2" Pon-Dobon (固定80点検証)';
+    sel.appendChild(opt2);
+  }
+
   document.addEventListener('click', (e) => {
     if (isGameOver || pendingDobonData || activeNakiType !== null) return;
     if (!e.target.closest('.fan-card') && !e.target.closest('button') && !e.target.closest('.deck-3d-stack')) {
@@ -280,7 +300,15 @@ function resumeGame() {
 
 function startGame(isResume = false) {
   if (isResume) return;
-  numPlayers = parseInt(document.getElementById('player-count-select').value);
+  const selVal = document.getElementById('player-count-select').value;
+  if (selVal === 'test_pon3' || selVal === 'test_pon2') {
+    testModeType = selVal;
+    numPlayers = 4;
+  } else {
+    testModeType = null;
+    numPlayers = parseInt(selVal);
+  }
+
   chomboMode = document.getElementById('chombo-mode-select').value;
   userTimeLimit = parseInt(document.getElementById('timer-mode-select').value);
   document.getElementById('start-modal').style.display = 'none';
@@ -304,7 +332,7 @@ function startGame(isResume = false) {
 
 function startRound() {
   isGameOver = false; stopTimer(); clearDobonStandby(); stopConfetti();
-  hideOutcomeBanner(); // ← これを追加
+  hideOutcomeBanner();
   createDeck52(); discardHistory = []; drawTwoStack = 0; designatedSuit = null;
   direction = -1; selectedIndices = []; cancelNakiMode(); pendingLastCheck = false;
   consecutivePassCount = 0;
@@ -327,9 +355,38 @@ function startRound() {
 
   for (let i = 0; i < 5; i++) setTimeout(playDealSound, i * 60);
 
+  // 通常配牌
   for (let p of players) {
     p.hand = deck.splice(0, 5);
     p.declaredLast = false;
+  }
+
+  // ★テストモード配牌の適用★
+  if (testModeType === 'test_pon3') {
+    // ユーザーは3♠, 3♥の2枚のみ
+    players[0].hand = [
+      { suit: '♠', label: '3', val: 3, color: 'black' },
+      { suit: '♥', label: '3', val: 3, color: 'red' }
+    ];
+    // CPU 1に3♦を持たせ、CPU 1からスタートさせる
+    players[1].hand = [
+      { suit: '♦', label: '3', val: 3, color: 'red' },
+      { suit: '♣', label: '9', val: 9, color: 'black' }
+    ];
+    nextRoundStarter = 1;
+    setMessage('【検証モード】CPU 1が3を出します。PONを押して確定してください！');
+  } else if (testModeType === 'test_pon2') {
+    // ユーザーは2♠, 2♥の2枚のみ（80点検証）
+    players[0].hand = [
+      { suit: '♠', label: '2', val: 2, color: 'black' },
+      { suit: '♥', label: '2', val: 2, color: 'red' }
+    ];
+    players[1].hand = [
+      { suit: '♦', label: '2', val: 2, color: 'red' },
+      { suit: '♣', label: '9', val: 9, color: 'black' }
+    ];
+    nextRoundStarter = 1;
+    setMessage('【検証モード】CPU 1が2を出します。PONを押して確定してください！');
   }
 
   let initCard = deck.pop();
@@ -342,7 +399,6 @@ function startRound() {
 
   turnIndex = nextRoundStarter % numPlayers;
   updateUI();
-  setMessage(`${players[turnIndex].name} Turn`);
 
   checkTenho();
 
@@ -409,7 +465,6 @@ function updateUI() {
   const dirEl = document.getElementById('dir-display');
   if (dirEl) dirEl.innerText = direction === -1 ? I18N[currentLang].dirCCW : I18N[currentLang].dirCW;
   
-  // 8特大マーク表示
   const giantBox = document.getElementById('giant-suit-indicator');
   const giantSym = document.getElementById('giant-suit-symbol');
   if (giantBox && giantSym) {
@@ -444,7 +499,6 @@ function updateUI() {
   const discardSumEl = document.getElementById('discard-sum-val');
   if (discardSumEl) discardSumEl.innerText = lastActionDiscard ? lastActionDiscard.totalVal : 0;
 
-  // 相手CPU立ち上げ配置（ドボンアタッカー枠フラッシュ）
   const arcContainer = document.getElementById('cpu-arc-container');
   if (arcContainer) {
     arcContainer.innerHTML = '';
@@ -489,7 +543,7 @@ function updateUI() {
     }
   }
 
-  // ★プレイヤーのドボン判定（手札2枚以上のみ・完全手動待ち）★
+  // プレイヤーのドボンボタン（完全手動）
   const user = players[0];
   const mySum = user ? user.hand.reduce((s, c) => s + c.val, 0) : 0;
   const targetVal = lastActionDiscard ? lastActionDiscard.totalVal : null;
@@ -497,7 +551,6 @@ function updateUI() {
 
   if (dobonBtn) {
     if (pendingDobonData && pendingDobonData.loser.id === 0) {
-      // ドボン返しチャンス（手元に残っている手札の合計値だけで判定）
       dobonBtn.innerText = 'DOBON-GAESHI';
       if (mySum === pendingDobonData.actionDiscard.totalVal && user.hand.length >= 2) {
         dobonBtn.classList.add('gaeshi-mode');
@@ -507,7 +560,6 @@ function updateUI() {
     } else {
       dobonBtn.innerText = 'DOBON';
       dobonBtn.classList.remove('gaeshi-mode');
-      // 手札2枚以上で、手札合計が合致していればボタン点滅（手札1枚では光らない）
       if (!isGameOver && targetVal !== null && mySum === targetVal && user && user.hand.length >= 2 && !user.bannedFromWin) {
         dobonBtn.classList.add('ready');
       } else {
@@ -687,18 +739,15 @@ function onCardClick(index) {
   else { selectedIndices = [index]; updateUI(); }
 }
 
-// カードを出す処理（★ラストバグ修正 ＆ 上がり処理★）
 function playUserCard(index) {
   const card = players[0].hand[index];
   const top = discardHistory[discardHistory.length - 1];
 
-  // 手札3枚以上なのにLAST状態で出したらチョンボ
   if (players[0].declaredLast && players[0].hand.length >= 3) {
     commitChombo(players[0], I18N[currentLang].chomboWrongLast);
     return;
   }
 
-  // 手札2枚なのにLAST未宣言で出そうとした場合：1回目は警告して手元に戻す
   if (players[0].hand.length === 2 && !players[0].declaredLast && !pendingLastCheck) {
     if (userLastWarningCount === 0) {
       userLastWarningCount++;
@@ -712,7 +761,6 @@ function playUserCard(index) {
     }
   }
 
-  // 手札1枚（最後の1枚）を出すとき：事前にLASTを宣言していなければチョンボ（宣言していれば正常に上がれる！）
   if (players[0].hand.length === 1 && !players[0].declaredLast) {
     commitChombo(players[0], I18N[currentLang].chomboMissLast);
     return;
@@ -951,19 +999,80 @@ function confirmNaki() {
     cancelNakiMode(); return;
   }
 
-  if (turnIndex === 0) speakVoice(req === 2 ? (currentLang === 'ja' ? 'ポン！' : 'Pon!') : (currentLang === 'ja' ? 'カン！' : 'Kan!'));
-
+  // ポン・カンの打牌処理
   selectedIndices.sort((a, b) => b - a).forEach(idx => players[0].hand.splice(idx, 1));
   cards.forEach(c => discardHistory.push(c));
 
   const isKan = (req === 3);
+  const isPon = !isKan;
   lastActionDiscard = {
     cards, totalVal: cards.length * val, playerId: 0,
-    isPon: !isKan, isKan, baseVal: val
+    isPon: isPon, isKan: isKan, baseVal: val
   };
+
+  // ★【ポンドボン / カンドボン判定】手札が0枚になった場合★
+  if (players[0].hand.length === 0) {
+    cancelNakiMode();
+    executePonDobonWin(players[0], top, isKan, val);
+    return;
+  }
+
+  if (turnIndex === 0) speakVoice(req === 2 ? (currentLang === 'ja' ? 'ポン！' : 'Pon!') : (currentLang === 'ja' ? 'カン！' : 'Kan!'));
 
   cancelNakiMode();
   handlePonKanEffects(cards, players[0]);
+}
+
+// ポンドボン・カンドボンの成立処理
+function executePonDobonWin(winner, discardCard, isKan, baseVal) {
+  isGameOver = true;
+  stopTimer();
+  clearDobonStandby();
+
+  // カードを出した相手（Discarder）
+  const loserId = lastActionDiscard && lastActionDiscard.playerId !== -1 ? lastActionDiscard.playerId : (winner.id - direction + numPlayers) % numPlayers;
+  const loser = players[loserId];
+
+  // ルール準拠: 出したカードを手札に戻して計算
+  loser.hand.push(discardCard);
+
+  let points = 0;
+  let title = '';
+  const loserCount = calculateSpecialHandCount(loser.hand);
+
+  if (isKan && baseVal === 2) {
+    // "2" Kan-Dobon: 固定160点
+    points = 160 * roundMultiplier;
+    title = '"2" KAN-DOBON WIN! (固定160点)';
+    speakVoice(currentLang === 'ja' ? 'カンドボン！' : 'Kan Dobon!');
+  } else if (isKan) {
+    // Normal Kan-Dobon: 8 pts / card
+    points = 8 * loserCount * roundMultiplier;
+    title = 'KAN-DOBON WIN! (8pt/枚)';
+    speakVoice(currentLang === 'ja' ? 'カンドボン！' : 'Kan Dobon!');
+  } else if (isPon && baseVal === 2) {
+    // "2" Pon-Dobon: 固定80点
+    points = 80 * roundMultiplier;
+    title = '"2" PON-DOBON WIN! (固定80点)';
+    speakVoice(currentLang === 'ja' ? 'ポンドボン！' : 'Pon Dobon!');
+  } else {
+    // Normal Pon-Dobon: 4 pts / card
+    points = 4 * loserCount * roundMultiplier;
+    title = 'PON-DOBON WIN! (4pt/枚)';
+    speakVoice(currentLang === 'ja' ? 'ポンドボン！' : 'Pon Dobon!');
+  }
+
+  const deltas = players.map(p => (p.id === winner.id ? points : (p.id === loser.id ? -points : 0)));
+  winner.score += points;
+  loser.score -= points;
+
+  recordRoundHistory(isKan ? 'KAN-DOBON' : 'PON-DOBON', deltas);
+  roundMultiplier = 1;
+  nextRoundStarter = winner.id;
+  updateUI();
+
+  showOutcomeBanner(winner.id === 0);
+  showResultModal(title, `<b>Winner: ${winner.name} (+${points}pt)</b><br>Target: ${loser.name} (-${points}pt)<br>${loser.name}手札換算: ${loserCount}枚`);
 }
 
 function handlePonKanEffects(cards, player) {
@@ -986,14 +1095,13 @@ function triggerUserDobon() {
   if (isGameOver) return;
   const user = players[0];
 
-  // ★【新規追加】手札1枚でのドボンは禁止（反則チョンボ！）★
+  // 手札1枚でのドボンは禁止（チョンボ）
   if (user.hand.length === 1) {
     commitChombo(user, I18N[currentLang].chomboSingleCardDobon);
     return;
   }
 
   if (pendingDobonData && pendingDobonData.loser.id === 0) {
-    // ドボン返し判定：手元に残っている手札の合計値だけで判定！
     const targetVal = pendingDobonData.actionDiscard.totalVal;
     const mySum = user.hand.reduce((s, c) => s + c.val, 0);
 
@@ -1008,7 +1116,6 @@ function triggerUserDobon() {
     }
   }
 
-  // 通常ドボン
   speakVoice(currentLang === 'ja' ? 'ドボン！' : 'Dobon!');
 
   if (user.bannedFromWin) {
@@ -1018,7 +1125,6 @@ function triggerUserDobon() {
   const mySum = user.hand.reduce((s, c) => s + c.val, 0);
   const targetVal = lastActionDiscard ? lastActionDiscard.totalVal : null;
 
-  // 手札2枚以上で合致していれば猶予開始
   if (targetVal !== null && mySum === targetVal && user.hand.length >= 2) {
     stopTimer();
     const loser = players[lastActionDiscard.playerId] || players[(user.id - direction + numPlayers) % numPlayers];
@@ -1028,7 +1134,7 @@ function triggerUserDobon() {
   }
 }
 
-// 10秒ドボン返し猶予タイマー（※カードは手札に戻さず手元の残り手札だけで判定）
+// 10秒ドボン返し猶予タイマー
 function startDobonStandby(winner, loser, actionDiscard) {
   stopTimer();
   pendingDobonData = { winner, loser, actionDiscard };
@@ -1041,7 +1147,6 @@ function startDobonStandby(winner, loser, actionDiscard) {
 
   updateUI();
 
-  // CPU側のドボン返し判定（手札2枚以上かつ手元の合計だけで判定）
   if (loser.id !== 0 && loser.hand.length >= 2) {
     const lSum = loser.hand.reduce((s, c) => s + c.val, 0);
     if (lSum === actionDiscard.totalVal && !loser.bannedFromWin) {
@@ -1073,11 +1178,9 @@ function clearDobonStandby() {
   seats.forEach(s => s.classList.remove('dobon-attacker'));
 }
 
-// 通常ドボン確定（★ここで初めて出した札を手札に戻して計算！★）
 function finalizeNormalDobon(winner, loser, actionDiscard) {
   isGameOver = true;
 
-  // ルール準拠: ドボン確定時に初めて出したカードを手札に戻す
   if (actionDiscard.cards) {
     actionDiscard.cards.forEach(c => loser.hand.push(c));
   }
@@ -1106,7 +1209,6 @@ function finalizeNormalDobon(winner, loser, actionDiscard) {
   pendingDobonData = null;
 }
 
-// ドボン返し成立処理（固定20点）
 function executeDobonGaeshiWin(winner, loser) {
   isGameOver = true;
   const points = 20 * roundMultiplier;
@@ -1175,10 +1277,11 @@ function commitChombo(offender, reason) {
   recordRoundHistory('CHOMBO', deltas);
 
   offender.bannedFromWin = true;
-  if (offender.id === 0) showOutcomeBanner(false);
   if (players.every(p => p.bannedFromWin)) players.forEach(p => p.bannedFromWin = false);
   roundMultiplier *= 2; nextRoundStarter = offender.id;
   updateUI();
+
+  if (offender.id === 0) showOutcomeBanner(false);
 
   showResultModal('CHOMBO!', `<b>Offender: ${offender.name} (-${totalFine}pt)</b><br>${reason}<br>* Multiplier: ${roundMultiplier}x`);
 }
@@ -1216,6 +1319,19 @@ function cpuTurn() {
     return;
   }
   pendingLastCheck = false;
+
+  // ★テストモード中：CPU 1は強制的に該当カードを打牌★
+  if (testModeType && cpu.id === 1) {
+    const testCard = cpu.hand[0];
+    playCardWithHandAnimation(cpu.id, testCard, () => {
+      cpu.hand.splice(0, 1);
+      discardHistory.push(testCard);
+      lastActionDiscard = { cards: [testCard], totalVal: testCard.val, playerId: cpu.id };
+      consecutivePassCount = 0;
+      postCardPlayEffect(testCard, cpu);
+    });
+    return;
+  }
 
   if (cpu.hand.length <= 2 && !cpu.declaredLast) cpu.declaredLast = true;
 
@@ -1292,12 +1408,10 @@ function cpuTurn() {
   }
 }
 
-// CPUの割り込みドボン判定（★プレイヤー p.id === 0 は除外 ＆ 手札2枚以上のみ★）
 function checkCpuInterrupts(targetVal, playedPlayerId) {
   if (isGameOver || pendingDobonData) return false;
 
   for (let p of players) {
-    // プレイヤー（0）、出した本人、上がり禁止、および手札1枚の人は除外！
     if (p.id === 0 || p.id === playedPlayerId || p.bannedFromWin || p.hand.length < 2) continue;
 
     if (p.hand.reduce((s, c) => s + c.val, 0) === targetVal) {
@@ -1400,6 +1514,7 @@ function toggleMinimizeResult() {
 
 function nextRound() {
   stopConfetti();
+  hideOutcomeBanner();
   document.getElementById('result-modal').style.display = 'none';
   document.getElementById('minimized-restore-bar').style.display = 'none';
 

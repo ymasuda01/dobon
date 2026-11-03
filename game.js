@@ -802,6 +802,14 @@ function playUserCard(index) {
         document.getElementById('suit-select-floating').style.display = 'block';
         return;
       }
+      // ★オンライン対戦中なら、相手にカードを出したことを送信★
+      if (isOnlineMatch && socket && currentRoomId) {
+        socket.emit('play_card', {
+          roomId: currentRoomId,
+          card: card,
+          designatedSuit: designatedSuit
+        });
+      }
       postCardPlayEffect(card, players[0]);
     });
   } else {
@@ -894,6 +902,10 @@ function onDeckClick() {
     selectedIndices = []; updateUI();
     consecutivePassCount++;
     checkNagare();
+    // ★オンライン対戦中なら、相手にカードを引いたことを送信★
+    if (isOnlineMatch && socket && currentRoomId) {
+      socket.emit('draw_card', { roomId: currentRoomId });
+    }
     passTurn(0);
   });
 }
@@ -1672,3 +1684,51 @@ function requestStartOnlineGame() {
     socket.emit('start_online_game', { roomId: currentRoomId });
   }
 }
+// 相手がカードを出した時を受信
+  socket.on('card_played_sync', (data) => {
+    // 相手（席1）の手札を1枚減らす
+    if (players[1] && players[1].hand.length > 0) {
+      players[1].hand.pop();
+    }
+
+    // 相手の席から手とカードのアニメーションを再生して場に置く！
+    playCardWithHandAnimation(1, data.card, () => {
+      discardHistory.push(data.card);
+      designatedSuit = data.designatedSuit || null;
+      lastActionDiscard = { cards: [data.card], totalVal: data.card.val, playerId: 1 };
+
+      updateUI();
+
+      // 相手の手札が0枚になったら相手の勝利
+      if (players[1] && players[1].hand.length === 0) {
+        endRoundNormalWin(players[1]);
+        return;
+      }
+
+      // ドローツー累積などの効果
+      if (data.card.val === 2) {
+        drawTwoStack += 2;
+        showDrawAlertBanner(`+${drawTwoStack} DRAW`);
+      }
+
+      // 自分の番に切り替え！
+      turnIndex = 0;
+      updateUI();
+      setMessage('あなたの番です！カードを出すか引いてください');
+      if (userTimeLimit > 0) startTimerWithDuration(userTimeLimit, handleUserTimeout);
+    });
+  });
+
+  // 相手が山札を引いた時を受信
+  socket.on('card_drawn_sync', () => {
+    playDrawAnimation(1, () => {
+      if (players[1]) {
+        players[1].hand.push(null); // 相手の枚数を増やす（裏面）
+      }
+      drawTwoStack = 0;
+      turnIndex = 0; // 自分の番へ
+      updateUI();
+      setMessage('相手が山札を引きました。あなたの番です！');
+      if (userTimeLimit > 0) startTimerWithDuration(userTimeLimit, handleUserTimeout);
+    });
+  });

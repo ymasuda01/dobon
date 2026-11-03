@@ -1,0 +1,16 @@
+{
+  "name": "DOBON Master",
+  "short_name": "DOBON",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08080a",
+  "theme_color": "#0a0806",
+  "icons": [
+    {
+      "src": "back.jpg",
+      "sizes": "192x192 512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

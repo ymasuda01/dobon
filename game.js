@@ -1555,15 +1555,16 @@ function resetChampionship() {
 }
 
 // ==========================================
-// リアルタイムオンライン通信エンジン (Render連携)
+// リアルタイムオンライン通信エンジン (部屋合流 & 配牌同期)
 // ==========================================
 const SERVER_URL = 'https://dobon-server-cdpg.onrender.com';
 let socket = null;
+let currentRoomId = null;
+let isOnlineMatch = false;
 
 if (typeof io !== 'undefined') {
   socket = io(SERVER_URL);
 
-  // サーバー接続成功時
   socket.on('connect', () => {
     const btn = document.getElementById('net-status-btn');
     if (btn) {
@@ -1571,10 +1572,9 @@ if (typeof io !== 'undefined') {
       btn.style.borderColor = '#2ecc71';
       btn.style.color = '#2ecc71';
     }
-    setMessage('サーバー接続成功！通信テスト可能です');
+    setMessage('オンラインサーバー接続中');
   });
 
-  // 切断時
   socket.on('disconnect', () => {
     const btn = document.getElementById('net-status-btn');
     if (btn) {
@@ -1584,18 +1584,91 @@ if (typeof io !== 'undefined') {
     }
   });
 
-  // 相手（または自分）からテスト電波が返ってきたとき
-  socket.on('test_pong', (data) => {
+  // 部屋メンバーが更新された時
+  socket.on('room_updated', (data) => {
+    document.getElementById('room-member-box').style.display = 'block';
+    document.getElementById('room-player-count').innerText = data.players.length;
+    
+    let html = '';
+    data.players.forEach((p, idx) => {
+      html += `<div>${idx + 1}. <b>${p.name}</b> ${p.id === socket.id ? '(あなた)' : ''}</div>`;
+    });
+    document.getElementById('room-player-list').innerHTML = html;
+
+    // 2人以上揃ったら「対局開始」ボタンを表示
+    const startBtn = document.getElementById('btn-start-sync-game');
+    if (data.players.length >= 2) {
+      startBtn.style.display = 'block';
+    } else {
+      startBtn.style.display = 'none';
+    }
+  });
+
+  // ★サーバーから同期カードが届いた瞬間★
+  socket.on('game_started_sync', (syncData) => {
+    closeOnlineRoomModal();
+    isOnlineMatch = true;
+    isGameOver = false;
+    stopTimer();
+    stopConfetti();
+
+    // サーバーから届いた共通情報に置き換え！
+    players = syncData.players.map((p, idx) => ({
+      id: idx,
+      name: p.name,
+      hand: idx === syncData.mySeatIndex ? syncData.myHand : new Array(p.cardCount).fill(null),
+      score: 0,
+      bannedFromWin: false,
+      declaredLast: false,
+      silhouette: `<svg viewBox="0 0 24 24" width="28" height="28" fill="#555"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`
+    }));
+
+    // 自分を手前の席（インデックス0）に並び替え
+    const mySeat = syncData.mySeatIndex;
+    const reorderedPlayers = [
+      players[mySeat],
+      ...players.slice(mySeat + 1),
+      ...players.slice(0, mySeat)
+    ];
+    players = reorderedPlayers;
+    players[0].name = 'YOU';
+
+    // 共通の場札・山札枚数を反映
+    discardHistory = [syncData.initialCard];
+    lastActionDiscard = { cards: [syncData.initialCard], totalVal: syncData.initialCard.val, playerId: -1 };
+    deck = new Array(syncData.deckCount).fill(null);
+
+    turnIndex = syncData.turnSeatIndex === mySeat ? 0 : 1;
+    updateUI();
     playDealSound();
-    alert(`【通信成功！】\n端末ID: ${data.sender}\n時間: ${data.time}\nメッセージ: ${data.message}`);
+    setMessage('【オンライン対戦開始】全員同じカード卓が同期されました！');
+
+    if (turnIndex === 0) startTimerWithDuration(userTimeLimit, handleUserTimeout);
   });
 }
 
-// テスト用：ボタンを押すとサーバー経由で全員に電波を飛ばす
-function sendTestPing() {
-  if (socket && socket.connected) {
-    socket.emit('test_ping', { message: 'スマホから電波送信！' });
-  } else {
-    alert('サーバー接続準備中です。無料サーバーのため初回起動に約30〜50秒かかる場合があります。少し待ってから再度押してください。');
+function openOnlineRoomModal() {
+  document.getElementById('online-room-modal').style.display = 'flex';
+}
+
+function closeOnlineRoomModal() {
+  document.getElementById('online-room-modal').style.display = 'none';
+}
+
+function joinOnlineRoom() {
+  if (!socket || !socket.connected) {
+    alert('サーバー接続中です。緑色のランプになるまで数秒お待ちください。');
+    return;
+  }
+  const roomId = document.getElementById('online-room-id').value.trim() || '777';
+  const name = document.getElementById('online-player-name').value.trim() || 'YOU';
+  currentRoomId = roomId;
+
+  socket.emit('join_room', { roomId, playerName: name });
+}
+
+function requestStartOnlineGame() {
+  if (socket && currentRoomId) {
+    socket.emit('start_online_game', { roomId: currentRoomId });
   }
 }

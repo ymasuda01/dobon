@@ -1553,3 +1553,49 @@ function resetChampionship() {
   players.forEach(p => { p.score = 0; p.bannedFromWin = false; });
   currentRound = 1; currentSet++; startRound();
 }
+
+// ==========================================
+// リアルタイムオンライン通信エンジン (Render連携)
+// ==========================================
+const SERVER_URL = 'https://dobon-server-cdpg.onrender.com';
+let socket = null;
+
+if (typeof io !== 'undefined') {
+  socket = io(SERVER_URL);
+
+  // サーバー接続成功時
+  socket.on('connect', () => {
+    const btn = document.getElementById('net-status-btn');
+    if (btn) {
+      btn.innerText = '🟢 ONLINE';
+      btn.style.borderColor = '#2ecc71';
+      btn.style.color = '#2ecc71';
+    }
+    setMessage('サーバー接続成功！通信テスト可能です');
+  });
+
+  // 切断時
+  socket.on('disconnect', () => {
+    const btn = document.getElementById('net-status-btn');
+    if (btn) {
+      btn.innerText = '🔴 OFFLINE';
+      btn.style.borderColor = '#e74c3c';
+      btn.style.color = '#e74c3c';
+    }
+  });
+
+  // 相手（または自分）からテスト電波が返ってきたとき
+  socket.on('test_pong', (data) => {
+    playDealSound();
+    alert(`【通信成功！】\n端末ID: ${data.sender}\n時間: ${data.time}\nメッセージ: ${data.message}`);
+  });
+}
+
+// テスト用：ボタンを押すとサーバー経由で全員に電波を飛ばす
+function sendTestPing() {
+  if (socket && socket.connected) {
+    socket.emit('test_ping', { message: 'スマホから電波送信！' });
+  } else {
+    alert('サーバー接続準備中です。無料サーバーのため初回起動に約30〜50秒かかる場合があります。少し待ってから再度押してください。');
+  }
+}

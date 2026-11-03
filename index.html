@@ -21,7 +21,7 @@
     position: relative;
   }
 
-  /* Lose時の画面激震エフェクト（暗転は完全撤廃） */
+  /* Lose時の画面激震 */
   body.shake-screen { animation: screenShakeLose 0.45s ease; }
   @keyframes screenShakeLose {
     0%, 100% { transform: translate(0, 0); }
@@ -31,7 +31,7 @@
     80% { transform: translate(5px, -3px); }
   }
 
-  /* 勝敗テロップバナー（WINNER! / LOSE...） */
+  /* 勝敗テロップバナー */
   #round-outcome-banner {
     position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0);
     z-index: 260; font-family: "Georgia", serif; font-weight: 900; letter-spacing: 3px;
@@ -61,19 +61,30 @@
     background: radial-gradient(circle at 50% 25%, rgba(20,10,5,0.2) 0%, rgba(5,5,5,0.85) 100%), url('background.png') right center / cover no-repeat;
     filter: blur(4px) brightness(0.65); transform: scale(1.05); z-index: 1; pointer-events: none;
   }
+
+  /* 上部ヘッダー（ボタンを綺麗に1行固定） */
   header {
-    background: rgba(12, 10, 8, 0.94); backdrop-filter: blur(10px); border-bottom: 2px solid rgba(245, 205, 121, 0.35);
-    padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; z-index: 60; flex-shrink: 0; gap: 4px;
+    background: rgba(12, 10, 8, 0.94); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(245, 205, 121, 0.25);
+    padding: 5px 8px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; z-index: 60; flex-shrink: 0; gap: 4px;
+    height: 40px;
   }
   .header-btn {
     background: rgba(45, 35, 25, 0.9); color: var(--gold); border: 1.5px solid var(--gold);
-    border-radius: 5px; padding: 4px 7px; font-size: 10px; font-weight: 900; cursor: pointer;
+    border-radius: 5px; padding: 3px 6px; font-size: 10px; font-weight: 900; cursor: pointer; white-space: nowrap;
   }
   .mult-tag { background: #e74c3c; color: #fff; padding: 1px 5px; border-radius: 8px; font-weight: bold; font-size: 9px; }
   
+  /* 【新設】メッセージ専用バナーバー（ヘッダーの1段下に配置して画面ズレを完全防止） */
+  #status-bar-container {
+    background: rgba(8, 6, 5, 0.85); border-bottom: 1.5px solid rgba(245, 205, 121, 0.3);
+    padding: 3px 12px; text-align: center; font-size: 11px; font-weight: bold; color: #ffeaa7;
+    z-index: 59; flex-shrink: 0; height: 24px; display: flex; align-items: center; justify-content: center;
+    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  }
+
   #table-perspective {
     flex: 1; position: relative; perspective: 700px; display: flex; justify-content: center; align-items: flex-end;
-    overflow: hidden; z-index: 10; margin-top: -10px;
+    overflow: hidden; z-index: 10; margin-top: -6px;
   }
   #poker-table {
     width: 98%; height: 92%; background: radial-gradient(ellipse at 50% 65%, #229962 0%, #157347 55%, #0b4528 100%);
@@ -145,9 +156,9 @@
   }
   .cpu-seat.active .cpu-info { background: var(--gold); color: #111; font-weight: 900; box-shadow: 0 0 12px var(--gold-glow); }
 
-  /* 手前側HUD（タイマー）：カードとボタンの間の広い安全スペースへ配置 */
+  /* 手前側HUD */
   #hud-time-container {
-    position: absolute; bottom: 75px; left: 50%; transform: translateX(-50%);
+    position: absolute; bottom: 215px; left: 50%; transform: translateX(-50%);
     display: flex; align-items: center; gap: 12px; z-index: 45;
     background: rgba(10, 8, 6, 0.88); border: 1.5px solid rgba(245, 205, 121, 0.5);
     padding: 4px 18px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.9);
@@ -171,7 +182,7 @@
   }
   @keyframes bannerPulse { 0%{transform:translate(-50%,-50%) scale(1)} 100%{transform:translate(-50%,-50%) scale(1.08); box-shadow:0 0 50px #ff4b4b;} }
 
-  /* 中央エリア（山札＆捨て札） */
+  /* 中央エリア */
   #center-table-field {
     position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); display: flex; justify-content: center; align-items: center; gap: 50px; z-index: 25;
   }
@@ -185,7 +196,7 @@
   .discard-stack-box { position: relative; width: 200px; height: 134px; }
   .discard-card-item { position: absolute; top: 0; transition: transform 0.2s; }
 
-  /* 8の指定マーク（捨て札の手前中央に配置） */
+  /* 8の指定マーク */
   #giant-suit-indicator {
     position: absolute; top: auto; bottom: -36px; left: 50%; transform: translateX(-50%);
     background: rgba(15, 12, 10, 0.95); border: 2.5px solid var(--gold); border-radius: 25px;
@@ -212,7 +223,7 @@
     transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
 
-  /* コントロールバー（手札の真上に整列） */
+  /* コントロールバー */
   #table-control-bar {
     position: absolute; bottom: 165px; left: 0; width: 100%; display: flex; justify-content: space-between;
     align-items: center; padding: 0 14px; z-index: 50; pointer-events: none;
@@ -256,13 +267,13 @@
     color: #fff; border: 2px solid #2ecc71; border-radius: 8px; padding: 8px 24px; font-size: 14px;
     font-weight: 900; display: none; z-index: 55; box-shadow: 0 0 15px rgba(46,204,113,0.8); letter-spacing: 1px;
   }
-  #top-left-skip-box { position: absolute; top: 52px; left: 10px; z-index: 40; }
+  #top-left-skip-box { position: absolute; top: 68px; left: 10px; z-index: 40; }
   .btn-skip-round {
     background: linear-gradient(135deg, #d35400, #962d22); color: #fff; border: 1.5px solid #f39c12;
     border-radius: 8px; padding: 7px 11px; font-size: 10px; font-weight: 900; cursor: pointer; display: none;
   }
 
-  /* ユーザー手札（底上げ＆2段化） */
+  /* ユーザー手札 */
   #user-fan-area {
     position: relative; width: 100%; height: 165px; display: flex; justify-content: center;
     align-items: flex-end; z-index: 35; flex-shrink: 0; padding-bottom: 8px;
@@ -278,7 +289,6 @@
   .card.black { color: var(--card-black); }
   .card-face-photo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 5px; z-index: 1; }
   
-  /* 数字とマーク（左上と右下） */
   .idx-top {
     position: absolute; top: 4px; left: 6px; z-index: 3;
     font-size: 16px; line-height: 1.05; font-family: "Georgia", serif; text-align: center;
@@ -355,25 +365,29 @@
 
 <div id="flash-overlay"></div>
 <canvas id="confetti-canvas"></canvas>
-<!-- 勝敗テロップバナー（WINNER! / LOSE...） -->
 <div id="round-outcome-banner"></div>
 <div id="casino-bg"></div>
 
+<!-- ヘッダー（ボタンを1行に固定しスリム化） -->
 <header>
-  <div style="display:flex; gap:5px; align-items:center;">
+  <div style="display:flex; gap:4px; align-items:center;">
     <button class="header-btn" onclick="toggleLang()" id="lang-btn">EN</button>
+    <button class="header-btn" id="net-status-btn" onclick="openOnlineRoomModal()">📶 CONNECTING...</button>
     <button class="header-btn" onclick="openPayoutModal()">PAYOUT</button>
-    <button class="header-btn" id="net-status-btn" onclick="document.getElementById('online-room-modal').style.display='flex'">📶 CONNECTING...</button>
     <button class="header-btn" onclick="suspendGame()">SAVE & QUIT</button>
     <button class="header-btn" style="border-color:#e74c3c; color:#ff7675;" onclick="quitToTitle()">QUIT</button>
-    <div>R<span id="round-num" style="color:var(--gold); font-weight:bold;">1</span> <span class="mult-tag" id="multiplier-display">1x</span></div>
   </div>
-  <div id="status-msg" style="color:#ffeaa7; font-weight:bold; font-size:11px;">READY</div>
-  <div style="display:flex; gap:6px; align-items:center;">
+  <div style="display:flex; gap:4px; align-items:center;">
+    <div>R<span id="round-num" style="color:var(--gold); font-weight:bold;">1</span> <span class="mult-tag" id="multiplier-display">1x</span></div>
     <button class="header-btn" onclick="openScoreHistoryModal()">HISTORY</button>
-    <div>TOTAL:<b id="user-sum" style="color:var(--gold); margin-left:3px;">0</b></div>
+    <div><b id="user-sum" style="color:var(--gold);">0</b></div>
   </div>
 </header>
+
+<!-- 【新設】メッセージ専用スリムバー（ヘッダー下で画面ズレを完全防止） -->
+<div id="status-bar-container">
+  <span id="status-msg">READY</span>
+</div>
 
 <div id="table-perspective">
   <div id="poker-table">
@@ -399,7 +413,6 @@
       </div>
     </div>
 
-    <!-- 手前側HUD -->
     <div id="hud-time-container">
       <span id="dir-display" style="font-size:11px; font-weight:bold;">CCW</span>
       <div id="timer-badge">TIME: <span id="timer-sec">--</span></div>
@@ -443,6 +456,7 @@
   <button class="suit-btn" style="color:#11141a;" onclick="selectSuit('♣')">♣</button>
 </div>
 
+<!-- 開始モーダル -->
 <div class="modal-overlay" id="start-modal">
   <div class="modal-content">
     <h2 style="margin:2px 0 12px; color:var(--gold); font-family:Georgia, serif; letter-spacing:1px;">DOBON MASTER</h2>
@@ -471,6 +485,7 @@
   </div>
 </div>
 
+<!-- WIN画面 -->
 <div class="modal-overlay" id="result-modal" style="display:none;">
   <div class="modal-content">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -481,7 +496,7 @@
     <div style="display:flex; justify-content:center; gap:4px; margin-top:8px;">
       <button class="modal-btn" onclick="openScoreHistoryModal()">HISTORY</button>
       <button class="modal-btn" onclick="suspendGame()">SAVE & QUIT</button>
-      <button class="modal-btn" onclick="nextRound()">NEXT ROUND</button>
+      <button class="modal-btn" onclick="requestNextRound()">NEXT ROUND</button>
     </div>
   </div>
 </div>
@@ -520,6 +535,7 @@
   </div>
 </div>
 
+<!-- 10回終了時大会表彰 -->
 <div class="modal-overlay" id="championship-modal" style="display:none;">
   <div class="modal-content">
     <h2 style="margin:2px 0 8px; color:var(--gold); font-family:Georgia, serif;">★ CHAMPIONSHIP RESULT ★</h2>
@@ -530,6 +546,7 @@
   </div>
 </div>
 
+<!-- 履歴モーダル -->
 <div class="modal-overlay" id="history-modal" style="display:none;">
   <div class="modal-content" style="max-width:96%; width:440px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">CHAMPIONSHIP HISTORY</h3>
@@ -537,37 +554,31 @@
     <button class="modal-btn" style="margin-top:8px;" onclick="closeScoreHistoryModal()">CLOSE</button>
   </div>
 </div>
+
 <!-- オンライン対戦部屋モーダル -->
 <div class="modal-overlay" id="online-room-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:340px;">
     <h3 style="margin:2px 0 10px; color:var(--gold);">ONLINE MULTIPLAYER</h3>
-    
     <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:4px;">プレイヤー名:</div>
     <input type="text" id="online-player-name" value="YOU" style="width:100%; font-size:14px; padding:6px; margin-bottom:10px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
-
     <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:4px;">部屋番号 (合言葉):</div>
     <input type="text" id="online-room-id" value="777" style="width:100%; font-size:14px; padding:6px; margin-bottom:12px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
-
     <button class="modal-btn" style="width:100%; padding:10px; margin-bottom:8px;" onclick="joinOnlineRoom()">部屋に入る / 作成</button>
-
-    <!-- 参加メンバー一覧 -->
     <div id="room-member-box" style="display:none; margin-top:10px; border-top:1px solid rgba(245,205,121,0.3); padding-top:8px;">
       <div style="font-size:11px; color:var(--gold); margin-bottom:6px;">参加中のプレイヤー: <span id="room-player-count">1</span>人</div>
       <div id="room-player-list" style="font-size:12px; line-height:1.6; margin-bottom:10px;"></div>
       <button class="modal-btn" id="btn-start-sync-game" style="width:100%; background:#27ae60; color:#fff; display:none;" onclick="requestStartOnlineGame()">対局開始 (カード配牌)</button>
     </div>
-
     <button class="modal-btn" style="background:#57606f; color:#fff; margin-top:6px;" onclick="closeOnlineRoomModal()">閉じる</button>
   </div>
 </div>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-
 <script src="game.js"></script>
 <script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
-}
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
 </script>
 </body>
 </html>

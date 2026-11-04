@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>DOBON - Las Vegas VIP Lounge</title>
+<!-- バージョン情報メタタグ -->
+<meta name="application-name" content="DOBON Master">
+<meta name="version" content="2026.00.001">
+<title>DOBON - Las Vegas VIP Lounge (2026.00.001)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -50,7 +53,7 @@
   }
   @keyframes textJitter { 0% { transform: translate(-50%, -50%) rotate(-3deg); } 100% { transform: translate(-50%, -50%) rotate(3deg); } }
 
-  /* 【新規】チョンボ発生時：点数2倍の超巨大ネオンアラートバナー */
+  /* チョンボ時：点数2倍の超巨大ネオンアラートバナー */
   #chombo-double-banner {
     position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%) scale(0);
     z-index: 270; pointer-events: none; text-align: center; opacity: 0;
@@ -79,15 +82,21 @@
   /* 上部ヘッダー */
   header {
     background: rgba(12, 10, 8, 0.94); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(245, 205, 121, 0.25);
-    padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; z-index: 60; flex-shrink: 0; gap: 4px;
+    padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; z-index: 60; flex-shrink: 0; gap: 4px;
     height: 42px;
   }
   .header-btn {
     background: rgba(45, 35, 25, 0.9); color: var(--gold); border: 1.5px solid var(--gold);
-    border-radius: 5px; padding: 4px 8px; font-size: 10px; font-weight: 900; cursor: pointer; white-space: nowrap;
+    border-radius: 5px; padding: 4px 7px; font-size: 10px; font-weight: 900; cursor: pointer; white-space: nowrap;
   }
-  .mult-tag { background: #e74c3c; color: #fff; padding: 1px 6px; border-radius: 8px; font-weight: bold; font-size: 9px; }
+  .mult-tag { background: #e74c3c; color: #fff; padding: 1px 5px; border-radius: 8px; font-weight: bold; font-size: 9px; }
   
+  /* バージョン表示バッジ */
+  .version-tag {
+    background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(245, 205, 121, 0.3);
+    color: var(--gold); font-size: 9px; font-family: monospace; padding: 2px 5px; border-radius: 4px;
+  }
+
   /* メッセージ専用スリムバー */
   #status-bar-container {
     background: rgba(8, 6, 5, 0.88); border-bottom: 1.5px solid rgba(245, 205, 121, 0.3);
@@ -96,7 +105,7 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
-  /* レスポンシブ3Dテーブル（タブレットとスマホで比率自動調整） */
+  /* レスポンシブ3Dテーブル */
   #table-perspective {
     flex: 1; position: relative; perspective: 750px; display: flex; justify-content: center; align-items: flex-end;
     overflow: hidden; z-index: 10; margin-top: -6px;
@@ -109,7 +118,7 @@
     flex-direction: column; justify-content: space-between; padding: 8px 12px; transform-style: preserve-3d;
   }
 
-  /* 相手プレイヤー配置（上部に十分引き上げ、場札と絶対被らない） */
+  /* 相手プレイヤー配置 */
   #cpu-arc-container {
     position: absolute; top: 4px; left: 0; width: 100%; height: 90px;
     display: flex; justify-content: space-around; align-items: flex-start; z-index: 20; transform-style: preserve-3d;
@@ -193,7 +202,7 @@
   }
   @keyframes giantGlow { 0%{transform:translateX(-50%) scale(1)} 100%{transform:translateX(-50%) scale(1.1); box-shadow: 0 0 40px #ffd700;} }
   
-  /* 手前側HUD（中央の空きスペースに配置、場札にもボタンにも被らない） */
+  /* 手前側HUD */
   #hud-time-container {
     position: absolute; bottom: 85px; left: 50%; transform: translateX(-50%);
     display: flex; align-items: center; gap: 12px; z-index: 45;
@@ -236,7 +245,7 @@
     pointer-events: none; z-index: 170; display: none; transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
 
-  /* コントロールバー（手札が2段になっても絶対被らない安全位置：手札エリアの上部） */
+  /* コントロールバー（手札2段時でも被らない配置） */
   #table-control-bar {
     position: absolute; bottom: clamp(180px, 24vh, 210px); left: 0; width: 100%;
     display: flex; justify-content: space-between; align-items: center;
@@ -288,7 +297,7 @@
     border-radius: 8px; padding: 6px 10px; font-size: 10px; font-weight: 900; cursor: pointer; display: none;
   }
 
-  /* ユーザー手札（底上げ＆画面外はみ出し完全防止） */
+  /* ユーザー手札 */
   #user-fan-area {
     position: relative; width: 100%; height: clamp(150px, 20vh, 185px);
     display: flex; justify-content: center; align-items: flex-end;
@@ -299,7 +308,7 @@
     display: flex; justify-content: center; align-items: flex-end;
   }
 
-  /* カードサイズ（レスポンシブスケール） */
+  /* カードサイズ */
   .card {
     width: clamp(72px, 12vw, 92px); height: clamp(105px, 17.5vw, 134px);
     background: #fafafa; border-radius: 7px; box-shadow: 0 3px 8px rgba(0,0,0,0.65);
@@ -332,11 +341,10 @@
   .fan-card.selected {
     box-shadow: 0 14px 28px rgba(245, 205, 121, 0.95) !important; border: 3px solid var(--gold) !important; z-index: 75 !important;
   }
-  /* 2段展開用の段差クラス（ボタンに被らない高さ設計） */
   .fan-card.row-back { bottom: clamp(30px, 4.5vh, 38px) !important; z-index: 30 !important; filter: brightness(0.92); }
   .fan-card.row-front { bottom: 0px !important; z-index: 45 !important; }
 
-  /* 8マーク選択（手札が見える明るいフロートUI） */
+  /* 8マーク選択 */
   #suit-select-floating {
     position: fixed; top: 46%; left: 50%; transform: translate(-50%, -50%);
     background: #fdfaf6; border: 3px solid var(--gold); border-radius: 16px;
@@ -414,7 +422,7 @@
 
 <div id="casino-bg"></div>
 
-<!-- ヘッダー（スリム1行） -->
+<!-- ヘッダー（バージョン表示付き） -->
 <header>
   <div style="display:flex; gap:4px; align-items:center;">
     <button class="header-btn" onclick="toggleLang()" id="lang-btn">EN</button>
@@ -427,17 +435,17 @@
     <div>R<span id="round-num" style="color:var(--gold); font-weight:bold;">1</span> <span class="mult-tag" id="multiplier-display">1x</span></div>
     <button class="header-btn" onclick="openScoreHistoryModal()">HISTORY</button>
     <div><b id="user-sum" style="color:var(--gold);">0</b></div>
+    <span class="version-tag" title="Game Version">v2026.00.001</span>
   </div>
 </header>
 
-<!-- メッセージ専用スリムバー（ヘッダー下・画面ズレ完全防止） -->
+<!-- メッセージ専用スリムバー -->
 <div id="status-bar-container">
   <span id="status-msg">READY</span>
 </div>
 
 <div id="table-perspective">
   <div id="poker-table">
-    <!-- 相手プレイヤー（奥の上部に引き上げ） -->
     <div id="cpu-arc-container"></div>
 
     <div id="dobon-gaeshi-banner">
@@ -461,7 +469,7 @@
       </div>
     </div>
 
-    <!-- 手前側HUD（中央の空きスペースに配置・被りなし） -->
+    <!-- 手前側HUD -->
     <div id="hud-time-container">
       <span id="dir-display" style="font-size:11px; font-weight:bold;">CCW</span>
       <div id="timer-badge">TIME: <span id="timer-sec">--</span></div>
@@ -478,7 +486,7 @@
   <div id="flying-draw-card"></div>
 </div>
 
-<!-- 操作ボタンバー（手札エリアの真上・被り完全防止） -->
+<!-- 操作ボタンバー -->
 <div id="table-control-bar">
   <button class="btn-dobon-huge" id="dobon-btn" onclick="triggerUserDobon()">DOBON</button>
   <div id="naki-center-group">
@@ -493,7 +501,7 @@
   <button class="btn-skip-round" id="skip-chombo-btn" onclick="skipChomboRound()">SKIP ROUND (-10pt)</button>
 </div>
 
-<!-- ユーザー手札（底上げ・画面外はみ出し防止） -->
+<!-- ユーザー手札 -->
 <div id="user-fan-area">
   <div id="user-fan"></div>
   <img class="user-grip-img" src="me.png" alt="My Hand">
@@ -507,10 +515,14 @@
   <button class="suit-btn" style="color:#11141a;" onclick="selectSuit('♣')">♣</button>
 </div>
 
-<!-- 【刷新】スタート画面（CPU戦 / オンライン対戦の選択、新規/再開の明確化） -->
+<!-- スタート画面（モード選択 ＆ バージョン明記） -->
 <div class="modal-overlay" id="start-modal">
   <div class="modal-content" style="max-width:92%; width:360px;">
-    <h2 style="margin:2px 0 12px; color:var(--gold); font-family:Georgia, serif; letter-spacing:1px;">DOBON MASTER</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+      <h2 style="margin:0; color:var(--gold); font-family:Georgia, serif; letter-spacing:1px;">DOBON MASTER</h2>
+      <span class="version-tag">v2026.00.001</span>
+    </div>
+    <div style="font-size:10px; color:#888; margin-bottom:12px;">Unofficial Tournament Standard - San Diego Edition</div>
     
     <div style="display:flex; gap:8px; margin-bottom:14px;">
       <button class="modal-btn" style="flex:1; padding:12px 6px;" onclick="selectGameMode('cpu')">
@@ -521,7 +533,7 @@
       </button>
     </div>
 
-    <!-- CPU設定エリア -->
+    <!-- CPU設定パネル -->
     <div id="cpu-config-panel">
       <div style="font-size:11px; margin-bottom:4px; text-align:left; color:#a4b0be;" id="lbl-players">参加人数 (あなた + CPU):</div>
       <select id="player-count-select" style="width:100%; font-size:13px; padding:6px; margin-bottom:8px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
@@ -553,7 +565,7 @@
   </div>
 </div>
 
-<!-- 【新規】オンラインロビーモーダル（部屋一覧・ワンタップ入室） -->
+<!-- オンラインロビーモーダル -->
 <div class="modal-overlay" id="online-lobby-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:380px;">
     <h3 style="margin:2px 0 10px; color:var(--gold);">ONLINE LOBBY</h3>
@@ -587,7 +599,7 @@
   </div>
 </div>
 
-<!-- 部屋待機画面モーダル（不足分CPU自動追加機能付き） -->
+<!-- 部屋待機画面モーダル -->
 <div class="modal-overlay" id="room-detail-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:340px;">
     <h3 id="room-detail-title" style="margin:2px 0 6px; color:var(--gold);">WAITING ROOM</h3>
@@ -663,7 +675,7 @@
   </div>
 </div>
 
-<!-- 履歴モーダル（アコーディオン式セット集計） -->
+<!-- 履歴モーダル -->
 <div class="modal-overlay" id="history-modal" style="display:none;">
   <div class="modal-content" style="max-width:96%; width:440px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">CHAMPIONSHIP HISTORY</h3>

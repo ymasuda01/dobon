@@ -21,7 +21,7 @@
     position: relative;
   }
 
-  /* Lose時の画面激震 */
+  /* 画面激震エフェクト */
   body.shake-screen { animation: screenShakeLose 0.45s ease; }
   @keyframes screenShakeLose {
     0%, 100% { transform: translate(0, 0); }
@@ -40,60 +40,78 @@
   }
   #round-outcome-banner.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
   #round-outcome-banner.winner {
-    font-size: 52px; color: var(--gold);
+    font-size: clamp(38px, 8vw, 56px); color: var(--gold);
     text-shadow: 0 0 25px rgba(245, 205, 121, 0.9), 0 0 50px #ffd700, 2px 4px 10px #000;
   }
   #round-outcome-banner.lose {
-    font-size: 48px; color: #8395a7;
+    font-size: clamp(34px, 7vw, 50px); color: #8395a7;
     text-shadow: 0 0 20px rgba(131, 149, 167, 0.8), 2px 4px 10px #000;
     animation: textJitter 0.3s ease-in-out infinite alternate;
   }
-  @keyframes textJitter {
-    0% { transform: translate(-50%, -50%) rotate(-3deg); }
-    100% { transform: translate(-50%, -50%) rotate(3deg); }
+  @keyframes textJitter { 0% { transform: translate(-50%, -50%) rotate(-3deg); } 100% { transform: translate(-50%, -50%) rotate(3deg); } }
+
+  /* 【新規】チョンボ発生時：点数2倍の超巨大ネオンアラートバナー */
+  #chombo-double-banner {
+    position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%) scale(0);
+    z-index: 270; pointer-events: none; text-align: center; opacity: 0;
+    background: rgba(10, 5, 5, 0.92); border: 3px solid #ff4757; border-radius: 20px;
+    padding: 18px 28px; box-shadow: 0 0 50px #ff4757, 0 0 80px rgba(255, 71, 87, 0.8);
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
   }
+  #chombo-double-banner.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  .chombo-txt-top { color: #ff6b81; font-size: clamp(18px, 4vw, 24px); font-weight: 900; letter-spacing: 2px; }
+  .chombo-txt-main {
+    color: var(--gold); font-size: clamp(26px, 6vw, 38px); font-weight: 900;
+    text-shadow: 0 0 20px #ffd700; margin: 6px 0;
+  }
+  .chombo-txt-sub { color: #fff; font-size: 12px; }
 
   #flash-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #fff; opacity: 0; pointer-events: none; z-index: 300; transition: opacity 0.08s ease-out; }
   #flash-overlay.active { opacity: 0.8; transition: none; }
   #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 250; display: none; }
+  
   #casino-bg {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
     background: radial-gradient(circle at 50% 25%, rgba(20,10,5,0.2) 0%, rgba(5,5,5,0.85) 100%), url('background.png') right center / cover no-repeat;
     filter: blur(4px) brightness(0.65); transform: scale(1.05); z-index: 1; pointer-events: none;
   }
 
-  /* 上部ヘッダー（ボタンを綺麗に1行固定） */
+  /* 上部ヘッダー */
   header {
     background: rgba(12, 10, 8, 0.94); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(245, 205, 121, 0.25);
-    padding: 5px 8px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; z-index: 60; flex-shrink: 0; gap: 4px;
-    height: 40px;
+    padding: 6px 12px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; z-index: 60; flex-shrink: 0; gap: 4px;
+    height: 42px;
   }
   .header-btn {
     background: rgba(45, 35, 25, 0.9); color: var(--gold); border: 1.5px solid var(--gold);
-    border-radius: 5px; padding: 3px 6px; font-size: 10px; font-weight: 900; cursor: pointer; white-space: nowrap;
+    border-radius: 5px; padding: 4px 8px; font-size: 10px; font-weight: 900; cursor: pointer; white-space: nowrap;
   }
-  .mult-tag { background: #e74c3c; color: #fff; padding: 1px 5px; border-radius: 8px; font-weight: bold; font-size: 9px; }
+  .mult-tag { background: #e74c3c; color: #fff; padding: 1px 6px; border-radius: 8px; font-weight: bold; font-size: 9px; }
   
-  /* 【新設】メッセージ専用バナーバー（ヘッダーの1段下に配置して画面ズレを完全防止） */
+  /* メッセージ専用スリムバー */
   #status-bar-container {
-    background: rgba(8, 6, 5, 0.85); border-bottom: 1.5px solid rgba(245, 205, 121, 0.3);
+    background: rgba(8, 6, 5, 0.88); border-bottom: 1.5px solid rgba(245, 205, 121, 0.3);
     padding: 3px 12px; text-align: center; font-size: 11px; font-weight: bold; color: #ffeaa7;
-    z-index: 59; flex-shrink: 0; height: 24px; display: flex; align-items: center; justify-content: center;
-    overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    z-index: 59; flex-shrink: 0; height: 26px; display: flex; align-items: center; justify-content: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
+  /* レスポンシブ3Dテーブル（タブレットとスマホで比率自動調整） */
   #table-perspective {
-    flex: 1; position: relative; perspective: 700px; display: flex; justify-content: center; align-items: flex-end;
+    flex: 1; position: relative; perspective: 750px; display: flex; justify-content: center; align-items: flex-end;
     overflow: hidden; z-index: 10; margin-top: -6px;
   }
   #poker-table {
-    width: 98%; height: 92%; background: radial-gradient(ellipse at 50% 65%, #229962 0%, #157347 55%, #0b4528 100%);
+    width: min(98%, 880px); height: 92%;
+    background: radial-gradient(ellipse at 50% 65%, #229962 0%, #157347 55%, #0b4528 100%);
     border: 14px solid #3a1e0b; border-bottom: none; box-shadow: inset 0 0 60px rgba(0,0,0,0.85), 0 20px 40px rgba(0,0,0,0.95);
     border-radius: 240px 240px 30px 30px; transform: rotateX(46deg); position: relative; display: flex;
     flex-direction: column; justify-content: space-between; padding: 8px 12px; transform-style: preserve-3d;
   }
+
+  /* 相手プレイヤー配置（上部に十分引き上げ、場札と絶対被らない） */
   #cpu-arc-container {
-    position: absolute; top: 12px; left: 0; width: 100%; height: 110px;
+    position: absolute; top: 4px; left: 0; width: 100%; height: 90px;
     display: flex; justify-content: space-around; align-items: flex-start; z-index: 20; transform-style: preserve-3d;
   }
   .cpu-seat {
@@ -103,14 +121,11 @@
   .cpu-billboard-stand {
     transform: rotateX(-46deg) translateZ(15px); display: flex; flex-direction: column; align-items: center; transform-origin: 50% 100%;
   }
-  
-  .cpu-seat.dobon-attacker { z-index: 120 !important; }
   .cpu-seat.dobon-attacker .cpu-billboard-stand {
     transform: rotateX(-46deg) translateZ(40px) scale(1.3) !important;
   }
   .cpu-seat.dobon-attacker .cpu-silhouette {
-    border-color: #ff3838 !important;
-    box-shadow: 0 0 35px #ff3838, 0 0 50px rgba(255, 56, 56, 0.9) !important;
+    border-color: #ff3838 !important; box-shadow: 0 0 35px #ff3838, 0 0 50px rgba(255, 56, 56, 0.9) !important;
     animation: attackerFlash 0.35s infinite alternate !important;
   }
   @keyframes attackerFlash {
@@ -119,7 +134,7 @@
   }
 
   .turn-indicator-badge {
-    position: absolute; top: -26px; background: var(--gold); color: #000; font-size: 8px; font-weight: 900;
+    position: absolute; top: -24px; background: var(--gold); color: #000; font-size: 8px; font-weight: 900;
     padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 10px var(--gold-glow); display: none;
     animation: bounceTurn 0.6s infinite alternate; z-index: 15;
   }
@@ -130,38 +145,60 @@
   }
   @keyframes seatPulse { 0%{transform:scale(1)} 100%{transform:scale(1.12)} }
   .cpu-silhouette {
-    width: 44px; height: 44px; border-radius: 50%; background: #111417; border: 2px solid rgba(245,205,121,0.5);
+    width: 38px; height: 38px; border-radius: 50%; background: #111417; border: 2px solid rgba(245,205,121,0.5);
     box-shadow: 0 4px 10px rgba(0,0,0,0.8); display: flex; justify-content: center; align-items: center; z-index: 1;
   }
-  .cpu-fan-cards { position: relative; width: 65px; height: 46px; display: flex; justify-content: center; align-items: flex-end; margin-top: -6px; z-index: 2; }
+  .cpu-fan-cards { position: relative; width: 60px; height: 40px; display: flex; justify-content: center; align-items: flex-end; margin-top: -6px; z-index: 2; }
   .cpu-fan-card {
-    position: absolute; width: 26px; height: 38px; border-radius: 3px; background: url('back.jpg') center/cover no-repeat;
+    position: absolute; width: 24px; height: 35px; border-radius: 3px; background: url('back.jpg') center/cover no-repeat;
     border: 1px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.7); transform-origin: 50% 150%;
   }
-  
   .cpu-hand-img {
-    position: absolute; bottom: -24px; left: 50%; transform: translateX(-45%) scale(0.5);
-    width: 140px; height: 140px; object-fit: contain; pointer-events: none; z-index: 5;
+    position: absolute; bottom: -20px; left: 50%; transform: translateX(-45%) scale(0.46);
+    width: 130px; height: 130px; object-fit: contain; pointer-events: none; z-index: 5;
     text-indent: -9999px; color: transparent; font-size: 0;
   }
   .user-grip-img {
-    position: absolute; bottom: -45px; left: 50%; transform: translateX(-50%) scale(0.46);
-    width: 280px; height: 280px; object-fit: contain; z-index: 60; pointer-events: none;
+    position: absolute; bottom: -45px; left: 50%; transform: translateX(-50%) scale(0.44);
+    width: 270px; height: 270px; object-fit: contain; z-index: 60; pointer-events: none;
     text-indent: -9999px; color: transparent; font-size: 0;
   }
-
   .cpu-info {
     background: rgba(10,10,10,0.92); border: 1.5px solid var(--gold); border-radius: 8px;
-    padding: 2px 7px; font-size: 9px; color: #fff; margin-top: 4px; text-align: center; white-space: nowrap; z-index: 10;
+    padding: 2px 6px; font-size: 8.5px; color: #fff; margin-top: 3px; text-align: center; white-space: nowrap; z-index: 10;
   }
   .cpu-seat.active .cpu-info { background: var(--gold); color: #111; font-weight: 900; box-shadow: 0 0 12px var(--gold-glow); }
 
-  /* 手前側HUD */
+  /* 中央エリア（山札＆捨て札） */
+  #center-table-field {
+    position: absolute; top: 43%; left: 50%; transform: translate(-50%, -50%);
+    display: flex; justify-content: center; align-items: center; gap: clamp(30px, 6vw, 60px); z-index: 25;
+  }
+  .deck-3d-stack { position: relative; width: clamp(75px, 12vw, 92px); height: clamp(110px, 18vw, 134px); cursor: pointer; }
+  .deck-3d-stack .layer {
+    position: absolute; width: 100%; height: 100%; border-radius: 7px; background: url('back.jpg') center/cover no-repeat;
+    border: 2px solid #fff; box-shadow: 0 3px 6px rgba(0,0,0,0.6);
+  }
+  .deck-3d-stack .layer:nth-child(1){transform:translate(-4px,-4px)} .deck-3d-stack .layer:nth-child(2){transform:translate(-3px,-3px)}
+  .deck-3d-stack .layer:nth-child(3){transform:translate(-2px,-2px)} .deck-3d-stack .layer:nth-child(4){transform:translate(0,0)}
+  .discard-stack-box { position: relative; width: clamp(150px, 24vw, 190px); height: clamp(110px, 18vw, 134px); }
+  .discard-card-item { position: absolute; top: 0; transition: transform 0.2s; }
+
+  /* 8指定マーク */
+  #giant-suit-indicator {
+    position: absolute; top: auto; bottom: -34px; left: 50%; transform: translateX(-50%);
+    background: rgba(15, 12, 10, 0.95); border: 2.5px solid var(--gold); border-radius: 25px;
+    padding: 2px 16px; display: none; align-items: center; gap: 8px; font-weight: 900; font-size: 14px;
+    box-shadow: 0 0 25px var(--gold-glow); z-index: 35; animation: giantGlow 1s infinite alternate; white-space: nowrap;
+  }
+  @keyframes giantGlow { 0%{transform:translateX(-50%) scale(1)} 100%{transform:translateX(-50%) scale(1.1); box-shadow: 0 0 40px #ffd700;} }
+  
+  /* 手前側HUD（中央の空きスペースに配置、場札にもボタンにも被らない） */
   #hud-time-container {
-    position: absolute; bottom: 215px; left: 50%; transform: translateX(-50%);
+    position: absolute; bottom: 85px; left: 50%; transform: translateX(-50%);
     display: flex; align-items: center; gap: 12px; z-index: 45;
     background: rgba(10, 8, 6, 0.88); border: 1.5px solid rgba(245, 205, 121, 0.5);
-    padding: 4px 18px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.9);
+    padding: 3px 16px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.9);
     white-space: nowrap; pointer-events: none;
   }
   #timer-badge {
@@ -173,65 +210,42 @@
 
   /* 10秒ドボン返し猶予バナー */
   #dobon-gaeshi-banner {
-    position: absolute; top: 24%; left: 50%; transform: translate(-50%, -50%);
+    position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%);
     background: linear-gradient(135deg, #d63031, #780e0e);
     border: 3px solid var(--gold); border-radius: 30px;
-    padding: 8px 24px; font-size: 16px; font-weight: 900; color: #fff;
+    padding: 6px 20px; font-size: 14px; font-weight: 900; color: #fff;
     box-shadow: 0 0 40px rgba(255, 75, 75, 0.9); z-index: 110; display: none; text-align: center;
     animation: bannerPulse 0.5s infinite alternate;
   }
-  @keyframes bannerPulse { 0%{transform:translate(-50%,-50%) scale(1)} 100%{transform:translate(-50%,-50%) scale(1.08); box-shadow:0 0 50px #ff4b4b;} }
+  @keyframes bannerPulse { 0%{transform:translate(-50%,-50%) scale(1)} 100%{transform:translate(-50%,-50%) scale(1.08);} }
 
-  /* 中央エリア */
-  #center-table-field {
-    position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); display: flex; justify-content: center; align-items: center; gap: 50px; z-index: 25;
-  }
-  .deck-3d-stack { position: relative; width: 92px; height: 134px; cursor: pointer; }
-  .deck-3d-stack .layer {
-    position: absolute; width: 100%; height: 100%; border-radius: 7px; background: url('back.jpg') center/cover no-repeat;
-    border: 2px solid #fff; box-shadow: 0 3px 6px rgba(0,0,0,0.6);
-  }
-  .deck-3d-stack .layer:nth-child(1){transform:translate(-4px,-4px)} .deck-3d-stack .layer:nth-child(2){transform:translate(-3px,-3px)}
-  .deck-3d-stack .layer:nth-child(3){transform:translate(-2px,-2px)} .deck-3d-stack .layer:nth-child(4){transform:translate(0,0)}
-  .discard-stack-box { position: relative; width: 200px; height: 134px; }
-  .discard-card-item { position: absolute; top: 0; transition: transform 0.2s; }
-
-  /* 8の指定マーク */
-  #giant-suit-indicator {
-    position: absolute; top: auto; bottom: -36px; left: 50%; transform: translateX(-50%);
-    background: rgba(15, 12, 10, 0.95); border: 2.5px solid var(--gold); border-radius: 25px;
-    padding: 3px 18px; display: none; align-items: center; gap: 8px; font-weight: 900; font-size: 15px;
-    box-shadow: 0 0 25px var(--gold-glow); z-index: 35; animation: giantGlow 1s infinite alternate;
-    white-space: nowrap;
-  }
-  @keyframes giantGlow { 0%{transform:translateX(-50%) scale(1)} 100%{transform:translateX(-50%) scale(1.1); box-shadow: 0 0 40px #ffd700;} }
-  
   #draw-alert-banner {
     position: absolute; top: 32%; left: 50%; transform: translate(-50%, -50%); background: linear-gradient(135deg, #c0392b, #8e1b1b);
-    border: 2px solid #fff; border-radius: 12px; padding: 10px 24px; font-size: 18px; font-weight: 900;
+    border: 2px solid #fff; border-radius: 12px; padding: 8px 20px; font-size: 16px; font-weight: 900;
     box-shadow: 0 0 30px rgba(231,76,60,0.9); z-index: 100; display: none; text-align: center;
   }
   #flying-play-unit {
-    position: absolute; width: 180px; height: 180px; pointer-events: none; z-index: 180; display: none;
+    position: absolute; width: 170px; height: 170px; pointer-events: none; z-index: 180; display: none;
     transition: transform 0.38s cubic-bezier(0.2, 0.85, 0.32, 1.15), opacity 0.15s ease;
   }
   #flying-card-slot { position: absolute; top: 20px; left: 45px; z-index: 2; }
-  #flying-hand-img { position: absolute; top: 0; left: 0; width: 180px; height: 180px; object-fit: contain; z-index: 3; }
+  #flying-hand-img { position: absolute; top: 0; left: 0; width: 170px; height: 170px; object-fit: contain; z-index: 3; }
   #flying-draw-card {
-    position: absolute; width: 92px; height: 134px; border-radius: 7px; background: url('back.jpg') center/cover no-repeat;
-    border: 2px solid #fff; box-shadow: 0 6px 15px rgba(0,0,0,0.8); pointer-events: none; z-index: 170; display: none;
-    transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: absolute; width: clamp(75px, 12vw, 92px); height: clamp(110px, 18vw, 134px); border-radius: 7px;
+    background: url('back.jpg') center/cover no-repeat; border: 2px solid #fff; box-shadow: 0 6px 15px rgba(0,0,0,0.8);
+    pointer-events: none; z-index: 170; display: none; transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
 
-  /* コントロールバー */
+  /* コントロールバー（手札が2段になっても絶対被らない安全位置：手札エリアの上部） */
   #table-control-bar {
-    position: absolute; bottom: 165px; left: 0; width: 100%; display: flex; justify-content: space-between;
-    align-items: center; padding: 0 14px; z-index: 50; pointer-events: none;
+    position: absolute; bottom: clamp(180px, 24vh, 210px); left: 0; width: 100%;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 clamp(8px, 3vw, 24px); z-index: 50; pointer-events: none;
   }
   #table-control-bar * { pointer-events: auto; }
   .btn-dobon-huge {
     background: linear-gradient(135deg, #e74c3c, #8e1b1b); color: #fff; border: 2.5px solid #ff7675;
-    border-radius: 12px; padding: 12px 18px; font-weight: 900; font-size: 15px; cursor: pointer;
+    border-radius: 12px; padding: 10px 16px; font-weight: 900; font-size: 14px; cursor: pointer;
     box-shadow: 0 4px 15px rgba(231,76,60,0.6); letter-spacing: 1px; transition: transform 0.1s;
   }
   .btn-dobon-huge:active { transform: scale(0.93); }
@@ -248,73 +262,81 @@
 
   .btn-last-toggle {
     background: linear-gradient(135deg, #2c3e50, #1a252f); color: var(--gold); border: 2px solid var(--gold);
-    border-radius: 10px; padding: 11px 16px; font-weight: 900; font-size: 13px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+    border-radius: 10px; padding: 10px 15px; font-weight: 900; font-size: 13px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.6);
   }
   .btn-last-toggle.active { background: var(--gold); color: #111; box-shadow: 0 0 15px var(--gold-glow); }
   .btn-last-toggle.urgent {
     background: #e74c3c; color: #fff; border-color: #ffd700; box-shadow: 0 0 25px rgba(231,76,60,1); animation: urgentFlash 0.5s infinite alternate;
   }
   @keyframes urgentFlash { 0%{transform:scale(1)} 100%{transform:scale(1.15)} }
-  #naki-center-group { display: flex; gap: 20px; align-items: center; }
+
+  #naki-center-group { display: flex; gap: 16px; align-items: center; }
   .btn-naki {
     background: rgba(30, 25, 20, 0.94); color: var(--gold); border: 2px solid var(--gold);
-    border-radius: 8px; padding: 8px 18px; font-size: 12px; font-weight: 900; cursor: pointer;
+    border-radius: 8px; padding: 7px 16px; font-size: 12px; font-weight: 900; cursor: pointer;
     box-shadow: 0 3px 8px rgba(0,0,0,0.6); letter-spacing: 1px;
   }
   .btn-naki.active { background: #e67e22; color: #fff; border-color: #f39c12; }
   #confirm-naki-btn {
-    position: absolute; bottom: 215px; left: 50%; transform: translateX(-50%); background: #27ae60;
+    position: absolute; bottom: clamp(235px, 30vh, 265px); left: 50%; transform: translateX(-50%); background: #27ae60;
     color: #fff; border: 2px solid #2ecc71; border-radius: 8px; padding: 8px 24px; font-size: 14px;
     font-weight: 900; display: none; z-index: 55; box-shadow: 0 0 15px rgba(46,204,113,0.8); letter-spacing: 1px;
   }
-  #top-left-skip-box { position: absolute; top: 68px; left: 10px; z-index: 40; }
+  #top-left-skip-box { position: absolute; top: 72px; left: 10px; z-index: 40; }
   .btn-skip-round {
     background: linear-gradient(135deg, #d35400, #962d22); color: #fff; border: 1.5px solid #f39c12;
-    border-radius: 8px; padding: 7px 11px; font-size: 10px; font-weight: 900; cursor: pointer; display: none;
+    border-radius: 8px; padding: 6px 10px; font-size: 10px; font-weight: 900; cursor: pointer; display: none;
   }
 
-  /* ユーザー手札 */
+  /* ユーザー手札（底上げ＆画面外はみ出し完全防止） */
   #user-fan-area {
-    position: relative; width: 100%; height: 165px; display: flex; justify-content: center;
-    align-items: flex-end; z-index: 35; flex-shrink: 0; padding-bottom: 8px;
+    position: relative; width: 100%; height: clamp(150px, 20vh, 185px);
+    display: flex; justify-content: center; align-items: flex-end;
+    z-index: 35; flex-shrink: 0; padding-bottom: 6px;
   }
-  #user-fan { position: relative; width: 100%; max-width: 480px; height: 100%; display: flex; justify-content: center; align-items: flex-end; }
+  #user-fan {
+    position: relative; width: 100%; max-width: min(96%, 600px); height: 100%;
+    display: flex; justify-content: center; align-items: flex-end;
+  }
 
+  /* カードサイズ（レスポンシブスケール） */
   .card {
-    width: 92px; height: 134px; background: #fafafa; border-radius: 7px;
-    box-shadow: 0 3px 8px rgba(0,0,0,0.65); display: block;
-    position: relative; flex-shrink: 0; border: 1.5px solid #ccc; overflow: hidden;
+    width: clamp(72px, 12vw, 92px); height: clamp(105px, 17.5vw, 134px);
+    background: #fafafa; border-radius: 7px; box-shadow: 0 3px 8px rgba(0,0,0,0.65);
+    display: block; position: relative; flex-shrink: 0; border: 1.5px solid #ccc; overflow: hidden;
   }
   .card.red { color: var(--card-red); }
   .card.black { color: var(--card-black); }
   .card-face-photo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 5px; z-index: 1; }
   
   .idx-top {
-    position: absolute; top: 4px; left: 6px; z-index: 3;
-    font-size: 16px; line-height: 1.05; font-family: "Georgia", serif; text-align: center;
+    position: absolute; top: 3px; left: 5px; z-index: 3;
+    font-size: clamp(13px, 2.2vw, 16px); line-height: 1.05; font-family: "Georgia", serif; text-align: center;
     text-shadow: 0 0 3px #fff, 0 0 6px #fff;
   }
   .idx-bottom {
-    position: absolute; bottom: 4px; right: 6px; z-index: 3;
-    font-size: 16px; line-height: 1.05; font-family: "Georgia", serif; text-align: center;
+    position: absolute; bottom: 3px; right: 5px; z-index: 3;
+    font-size: clamp(13px, 2.2vw, 16px); line-height: 1.05; font-family: "Georgia", serif; text-align: center;
     transform: rotate(180deg); text-shadow: 0 0 3px #fff, 0 0 6px #fff;
   }
 
   .pips-container-real { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
-  .pip-real { position: absolute; font-size: 18px; line-height: 1; transform: translate(-50%, -50%); }
+  .pip-real { position: absolute; font-size: clamp(14px, 2.4vw, 18px); line-height: 1; transform: translate(-50%, -50%); }
   .pip-real.flip { transform: translate(-50%, -50%) rotate(180deg); }
-  .pip-center-huge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 44px; line-height: 1; }
+  .pip-center-huge { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: clamp(34px, 5.5vw, 44px); line-height: 1; }
 
   .fan-card {
-    position: absolute; bottom: 8px; transform-origin: 50% 190%;
+    position: absolute; bottom: 6px; transform-origin: 50% 190%;
     transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.3, 1), box-shadow 0.2s;
   }
   .fan-card.selected {
     box-shadow: 0 14px 28px rgba(245, 205, 121, 0.95) !important; border: 3px solid var(--gold) !important; z-index: 75 !important;
   }
-  .fan-card.row-back { bottom: 36px !important; z-index: 30 !important; filter: brightness(0.92); }
-  .fan-card.row-front { bottom: 2px !important; z-index: 45 !important; }
+  /* 2段展開用の段差クラス（ボタンに被らない高さ設計） */
+  .fan-card.row-back { bottom: clamp(30px, 4.5vh, 38px) !important; z-index: 30 !important; filter: brightness(0.92); }
+  .fan-card.row-front { bottom: 0px !important; z-index: 45 !important; }
 
+  /* 8マーク選択（手札が見える明るいフロートUI） */
   #suit-select-floating {
     position: fixed; top: 46%; left: 50%; transform: translate(-50%, -50%);
     background: #fdfaf6; border: 3px solid var(--gold); border-radius: 16px;
@@ -326,13 +348,14 @@
     border-radius: 8px; border: 1.5px solid #ccc; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
   }
 
+  /* モーダル共通 */
   .modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(5, 5, 5, 0.92);
     backdrop-filter: blur(10px); display: flex; justify-content: center; align-items: center; z-index: 200;
   }
   .modal-content {
     background: linear-gradient(145deg, #231b14, #120e0a); border: 2px solid var(--gold);
-    border-radius: 14px; padding: 16px 20px; text-align: center; max-width: 92%; min-width: 290px;
+    border-radius: 14px; padding: 18px 22px; text-align: center; max-width: 92%; min-width: 290px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.95);
   }
   #result-modal { align-items: flex-start; padding-top: 20px; background: rgba(0, 0, 0, 0.55); }
@@ -344,9 +367,24 @@
   }
   .modal-btn {
     background: linear-gradient(135deg, var(--gold), #b38924); color: #111; font-size: 13px;
-    padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 900; margin: 3px;
+    padding: 9px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: 900; margin: 4px;
+  }
+  .modal-btn-sub {
+    background: #34495e; color: #fff; border: 1px solid #7f8c8d;
   }
 
+  /* ロビー用ルームリスト */
+  .lobby-room-item {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(245,205,121,0.3); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; transition: 0.2s;
+  }
+  .lobby-room-item:hover { background: rgba(245,205,121,0.15); border-color: var(--gold); }
+  .lobby-room-item.full { opacity: 0.5; pointer-events: none; }
+  .badge-playing { background: #e74c3c; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 4px; }
+  .badge-open { background: #2ecc71; color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 4px; }
+
+  /* アコーディオン履歴 */
   .accordion-item {
     border: 1px solid rgba(245, 205, 121, 0.35); border-radius: 6px; margin-bottom: 8px; overflow: hidden; background: rgba(0,0,0,0.4);
   }
@@ -366,16 +404,24 @@
 <div id="flash-overlay"></div>
 <canvas id="confetti-canvas"></canvas>
 <div id="round-outcome-banner"></div>
+
+<!-- チョンボ時×2倍強調バナー -->
+<div id="chombo-double-banner">
+  <div class="chombo-txt-top">CHOMBO / FOUL!</div>
+  <div class="chombo-txt-main">NEXT ROUND ALL POINTS ×2 !!</div>
+  <div class="chombo-txt-sub" id="chombo-offender-desc">罰則者から全員へ点数支払い ＆ 次回得点倍率が倍々累積！</div>
+</div>
+
 <div id="casino-bg"></div>
 
-<!-- ヘッダー（ボタンを1行に固定しスリム化） -->
+<!-- ヘッダー（スリム1行） -->
 <header>
   <div style="display:flex; gap:4px; align-items:center;">
     <button class="header-btn" onclick="toggleLang()" id="lang-btn">EN</button>
-    <button class="header-btn" id="net-status-btn" onclick="openOnlineRoomModal()">📶 CONNECTING...</button>
+    <button class="header-btn" id="net-status-btn" onclick="openLobbyModal()">📶 CONNECTING...</button>
     <button class="header-btn" onclick="openPayoutModal()">PAYOUT</button>
-    <button class="header-btn" onclick="suspendGame()">SAVE & QUIT</button>
-    <button class="header-btn" style="border-color:#e74c3c; color:#ff7675;" onclick="quitToTitle()">QUIT</button>
+    <button class="header-btn" onclick="suspendGame()">SUSPEND (中断)</button>
+    <button class="header-btn" style="border-color:#e74c3c; color:#ff7675;" onclick="quitToTitle()">QUIT (終了)</button>
   </div>
   <div style="display:flex; gap:4px; align-items:center;">
     <div>R<span id="round-num" style="color:var(--gold); font-weight:bold;">1</span> <span class="mult-tag" id="multiplier-display">1x</span></div>
@@ -384,19 +430,21 @@
   </div>
 </header>
 
-<!-- 【新設】メッセージ専用スリムバー（ヘッダー下で画面ズレを完全防止） -->
+<!-- メッセージ専用スリムバー（ヘッダー下・画面ズレ完全防止） -->
 <div id="status-bar-container">
   <span id="status-msg">READY</span>
 </div>
 
 <div id="table-perspective">
   <div id="poker-table">
+    <!-- 相手プレイヤー（奥の上部に引き上げ） -->
     <div id="cpu-arc-container"></div>
 
     <div id="dobon-gaeshi-banner">
       DOBON! COUNTER CHANCE: <span id="gaeshi-countdown">10</span>s
     </div>
 
+    <!-- 中央エリア（山札＆捨て札） -->
     <div id="center-table-field">
       <div style="text-align:center;">
         <div class="deck-3d-stack" onclick="onDeckClick()">
@@ -413,6 +461,7 @@
       </div>
     </div>
 
+    <!-- 手前側HUD（中央の空きスペースに配置・被りなし） -->
     <div id="hud-time-container">
       <span id="dir-display" style="font-size:11px; font-weight:bold;">CCW</span>
       <div id="timer-badge">TIME: <span id="timer-sec">--</span></div>
@@ -429,6 +478,7 @@
   <div id="flying-draw-card"></div>
 </div>
 
+<!-- 操作ボタンバー（手札エリアの真上・被り完全防止） -->
 <div id="table-control-bar">
   <button class="btn-dobon-huge" id="dobon-btn" onclick="triggerUserDobon()">DOBON</button>
   <div id="naki-center-group">
@@ -443,6 +493,7 @@
   <button class="btn-skip-round" id="skip-chombo-btn" onclick="skipChomboRound()">SKIP ROUND (-10pt)</button>
 </div>
 
+<!-- ユーザー手札（底上げ・画面外はみ出し防止） -->
 <div id="user-fan-area">
   <div id="user-fan"></div>
   <img class="user-grip-img" src="me.png" alt="My Hand">
@@ -456,32 +507,98 @@
   <button class="suit-btn" style="color:#11141a;" onclick="selectSuit('♣')">♣</button>
 </div>
 
-<!-- 開始モーダル -->
+<!-- 【刷新】スタート画面（CPU戦 / オンライン対戦の選択、新規/再開の明確化） -->
 <div class="modal-overlay" id="start-modal">
-  <div class="modal-content">
+  <div class="modal-content" style="max-width:92%; width:360px;">
     <h2 style="margin:2px 0 12px; color:var(--gold); font-family:Georgia, serif; letter-spacing:1px;">DOBON MASTER</h2>
-    <div style="font-size:11px; margin-bottom:4px; text-align:left; color:#a4b0be;" id="lbl-players">PLAYERS:</div>
-    <select id="player-count-select" style="width:100%; font-size:13px; padding:6px; margin-bottom:8px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
-      <option value="4" selected>4 Players (You + 3 CPUs)</option>
-      <option value="5">5 Players (Recommended)</option>
-      <option value="6">6 Players</option>
-    </select>
-    <div style="font-size:11px; margin-bottom:4px; text-align:left; color:#a4b0be;" id="lbl-chombo">RULE MODE:</div>
-    <select id="chombo-mode-select" style="width:100%; font-size:13px; padding:6px; margin-bottom:8px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
-      <option value="strict" selected>Strict (Tournament Rules)</option>
-      <option value="assist">Assist (Practice Mode)</option>
-    </select>
-    <div style="font-size:11px; margin-bottom:4px; text-align:left; color:#a4b0be;" id="lbl-timer">TIME LIMIT:</div>
-    <select id="timer-mode-select" style="width:100%; font-size:13px; padding:6px; margin-bottom:14px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
-      <option value="0" selected>Unlimited (時間無制限)</option>
-      <option value="5">5 Seconds (Warning at 3s)</option>
-      <option value="10">10 Seconds (Warning at 5s)</option>
-      <option value="15">15 Seconds</option>
-      <option value="20">20 Seconds</option>
-      <option value="25">25 Seconds</option>
-    </select>
-    <button class="modal-btn" style="width:100%; padding:10px;" onclick="startGame(false)">START GAME</button>
-    <button class="modal-btn" id="resume-btn" style="width:100%; padding:10px; margin-top:8px; background:#2980b9; color:#fff; display:none;" onclick="resumeGame()">RESUME</button>
+    
+    <div style="display:flex; gap:8px; margin-bottom:14px;">
+      <button class="modal-btn" style="flex:1; padding:12px 6px;" onclick="selectGameMode('cpu')">
+        🤖 一人で遊ぶ<br><span style="font-size:10px; font-weight:normal;">(VS CPU)</span>
+      </button>
+      <button class="modal-btn" style="flex:1; padding:12px 6px; background:#2980b9;" onclick="selectGameMode('online')">
+        🌐 オンライン対戦<br><span style="font-size:10px; font-weight:normal;">(MULTIPLAYER)</span>
+      </button>
+    </div>
+
+    <!-- CPU設定エリア -->
+    <div id="cpu-config-panel">
+      <div style="font-size:11px; margin-bottom:4px; text-align:left; color:#a4b0be;" id="lbl-players">参加人数 (あなた + CPU):</div>
+      <select id="player-count-select" style="width:100%; font-size:13px; padding:6px; margin-bottom:8px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
+        <option value="4" selected>4人 (あなた + CPU 3人)</option>
+        <option value="2">2人 (あなた + CPU 1人)</option>
+        <option value="3">3人 (あなた + CPU 2人)</option>
+        <option value="5">5人 (推奨)</option>
+        <option value="6">6人</option>
+      </select>
+
+      <div style="font-size:11px; margin-bottom:4px; text-align:left; color:#a4b0be;" id="lbl-chombo">判定モード:</div>
+      <select id="chombo-mode-select" style="width:100%; font-size:13px; padding:6px; margin-bottom:8px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
+        <option value="strict" selected>Strict (Tournament Rules)</option>
+        <option value="assist">Assist (Practice Mode)</option>
+      </select>
+
+      <div style="font-size:11px; margin-bottom:4px; text-align:left; color:#a4b0be;" id="lbl-timer">制限時間:</div>
+      <select id="timer-mode-select" style="width:100%; font-size:13px; padding:6px; margin-bottom:14px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
+        <option value="0" selected>Unlimited (時間無制限)</option>
+        <option value="5">5 Seconds (Warning at 3s)</option>
+        <option value="10">10 Seconds (Warning at 5s)</option>
+        <option value="15">15 Seconds</option>
+        <option value="20">20 Seconds</option>
+      </select>
+
+      <button class="modal-btn" style="width:100%; padding:10px;" onclick="startCpuNewGame()">NEW GAME (新規開始)</button>
+      <button class="modal-btn modal-btn-sub" id="resume-btn" style="width:100%; padding:10px; margin-top:8px; display:none;" onclick="resumeGame()">RESUME (中断データから再開)</button>
+    </div>
+  </div>
+</div>
+
+<!-- 【新規】オンラインロビーモーダル（部屋一覧・ワンタップ入室） -->
+<div class="modal-overlay" id="online-lobby-modal" style="display:none;">
+  <div class="modal-content" style="max-width:92%; width:380px;">
+    <h3 style="margin:2px 0 10px; color:var(--gold);">ONLINE LOBBY</h3>
+
+    <div style="display:flex; gap:6px; margin-bottom:12px;">
+      <input type="text" id="lobby-player-name" value="YOU" placeholder="プレイヤー名" style="flex:1; font-size:13px; padding:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
+      <button class="header-btn" onclick="fetchRoomList()">更新 🔄</button>
+    </div>
+
+    <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:6px;">対局部屋一覧 (タップして入室):</div>
+    <div id="lobby-room-container" style="max-height:160px; overflow-y:auto; margin-bottom:12px; text-align:left;">
+      <div style="font-size:11px; color:#888; text-align:center; padding:15px;">部屋情報を取得中...</div>
+    </div>
+
+    <!-- 部屋作成フォーム -->
+    <div style="border-top:1px solid rgba(245,205,121,0.3); padding-top:10px; margin-bottom:10px;">
+      <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:4px;">新しい部屋を作成:</div>
+      <div style="display:flex; gap:6px; margin-bottom:8px;">
+        <input type="text" id="create-room-name" placeholder="部屋名 (例: VIP Room)" style="flex:2; font-size:12px; padding:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
+        <select id="create-room-max" style="flex:1; font-size:12px; padding:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
+          <option value="4" selected>4人卓</option>
+          <option value="2">2人卓</option>
+          <option value="3">3人卓</option>
+          <option value="5">5人卓</option>
+        </select>
+      </div>
+      <button class="modal-btn" style="width:100%; background:#27ae60; color:#fff; padding:9px;" onclick="createOnlineRoom()">部屋を作成して待機</button>
+    </div>
+
+    <button class="modal-btn modal-btn-sub" style="width:100%;" onclick="closeLobbyModal()">戻る</button>
+  </div>
+</div>
+
+<!-- 部屋待機画面モーダル（不足分CPU自動追加機能付き） -->
+<div class="modal-overlay" id="room-detail-modal" style="display:none;">
+  <div class="modal-content" style="max-width:92%; width:340px;">
+    <h3 id="room-detail-title" style="margin:2px 0 6px; color:var(--gold);">WAITING ROOM</h3>
+    <div id="room-detail-desc" style="font-size:11px; color:#aaa; margin-bottom:10px;"></div>
+
+    <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:4px;">参加メンバー:</div>
+    <div id="room-detail-players" style="font-size:13px; line-height:1.8; text-align:left; margin-bottom:12px; background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:6px;"></div>
+
+    <div style="font-size:10px; color:#f5cd79; margin-bottom:10px;">※人数が満たない場合は不足枠にCPUが自動追加されます</div>
+    <button class="modal-btn" style="width:100%; background:#27ae60; color:#fff; padding:10px;" onclick="requestStartOnlineGame()">対局開始 (ゲームスタート)</button>
+    <button class="modal-btn modal-btn-sub" style="width:100%; margin-top:6px;" onclick="leaveRoomAndBackToLobby()">退室してロビーへ</button>
   </div>
 </div>
 
@@ -495,7 +612,7 @@
     <div id="result-detail" style="text-align:left; font-size:11px; line-height:1.4; margin:6px 0; max-height:160px; overflow-y:auto;"></div>
     <div style="display:flex; justify-content:center; gap:4px; margin-top:8px;">
       <button class="modal-btn" onclick="openScoreHistoryModal()">HISTORY</button>
-      <button class="modal-btn" onclick="suspendGame()">SAVE & QUIT</button>
+      <button class="modal-btn" onclick="suspendGame()">SUSPEND (中断)</button>
       <button class="modal-btn" onclick="requestNextRound()">NEXT ROUND</button>
     </div>
   </div>
@@ -546,30 +663,12 @@
   </div>
 </div>
 
-<!-- 履歴モーダル -->
+<!-- 履歴モーダル（アコーディオン式セット集計） -->
 <div class="modal-overlay" id="history-modal" style="display:none;">
   <div class="modal-content" style="max-width:96%; width:440px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">CHAMPIONSHIP HISTORY</h3>
     <div id="accordion-history-container" style="max-height:280px; overflow-y:auto; text-align:left;"></div>
     <button class="modal-btn" style="margin-top:8px;" onclick="closeScoreHistoryModal()">CLOSE</button>
-  </div>
-</div>
-
-<!-- オンライン対戦部屋モーダル -->
-<div class="modal-overlay" id="online-room-modal" style="display:none;">
-  <div class="modal-content" style="max-width:92%; width:340px;">
-    <h3 style="margin:2px 0 10px; color:var(--gold);">ONLINE MULTIPLAYER</h3>
-    <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:4px;">プレイヤー名:</div>
-    <input type="text" id="online-player-name" value="YOU" style="width:100%; font-size:14px; padding:6px; margin-bottom:10px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
-    <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:4px;">部屋番号 (合言葉):</div>
-    <input type="text" id="online-room-id" value="777" style="width:100%; font-size:14px; padding:6px; margin-bottom:12px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
-    <button class="modal-btn" style="width:100%; padding:10px; margin-bottom:8px;" onclick="joinOnlineRoom()">部屋に入る / 作成</button>
-    <div id="room-member-box" style="display:none; margin-top:10px; border-top:1px solid rgba(245,205,121,0.3); padding-top:8px;">
-      <div style="font-size:11px; color:var(--gold); margin-bottom:6px;">参加中のプレイヤー: <span id="room-player-count">1</span>人</div>
-      <div id="room-player-list" style="font-size:12px; line-height:1.6; margin-bottom:10px;"></div>
-      <button class="modal-btn" id="btn-start-sync-game" style="width:100%; background:#27ae60; color:#fff; display:none;" onclick="requestStartOnlineGame()">対局開始 (カード配牌)</button>
-    </div>
-    <button class="modal-btn" style="background:#57606f; color:#fff; margin-top:6px;" onclick="closeOnlineRoomModal()">閉じる</button>
   </div>
 </div>
 

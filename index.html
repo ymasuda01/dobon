@@ -3,10 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<!-- バージョン情報メタタグ -->
 <meta name="application-name" content="DOBON Master">
-<meta name="version" content="2026.00.001">
-<title>DOBON - Las Vegas VIP Lounge (2026.00.001)</title>
+<meta name="version" content="2026.00.002">
+<title>DOBON - Las Vegas VIP Lounge (2026.00.002)</title>
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -90,8 +89,6 @@
     border-radius: 5px; padding: 4px 7px; font-size: 10px; font-weight: 900; cursor: pointer; white-space: nowrap;
   }
   .mult-tag { background: #e74c3c; color: #fff; padding: 1px 5px; border-radius: 8px; font-weight: bold; font-size: 9px; }
-  
-  /* バージョン表示バッジ */
   .version-tag {
     background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(245, 205, 121, 0.3);
     color: var(--gold); font-size: 9px; font-family: monospace; padding: 2px 5px; border-radius: 4px;
@@ -105,7 +102,7 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
-  /* レスポンシブ3Dテーブル */
+  /* 3Dテーブル */
   #table-perspective {
     flex: 1; position: relative; perspective: 750px; display: flex; justify-content: center; align-items: flex-end;
     overflow: hidden; z-index: 10; margin-top: -6px;
@@ -245,7 +242,7 @@
     pointer-events: none; z-index: 170; display: none; transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
   }
 
-  /* コントロールバー（手札2段時でも被らない配置） */
+  /* コントロールバー */
   #table-control-bar {
     position: absolute; bottom: clamp(180px, 24vh, 210px); left: 0; width: 100%;
     display: flex; justify-content: space-between; align-items: center;
@@ -297,18 +294,32 @@
     border-radius: 8px; padding: 6px 10px; font-size: 10px; font-weight: 900; cursor: pointer; display: none;
   }
 
-  /* ユーザー手札 */
+  /* 【新機能】ユーザー手札エリア（自分の手番時にゴールドネオン発光） */
   #user-fan-area {
     position: relative; width: 100%; height: clamp(150px, 20vh, 185px);
     display: flex; justify-content: center; align-items: flex-end;
     z-index: 35; flex-shrink: 0; padding-bottom: 6px;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
   }
+  #user-fan-area.your-turn-active {
+    box-shadow: inset 0 -30px 40px rgba(245, 205, 121, 0.4), 0 0 35px var(--gold-glow);
+  }
+
+  /* 自分の番を示す「▼ YOUR TURN ▼」バッジ */
+  #user-turn-badge {
+    position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+    background: var(--gold); color: #000; font-size: 9px; font-weight: 900;
+    padding: 2px 10px; border-radius: 12px; box-shadow: 0 0 12px var(--gold-glow);
+    display: none; animation: bounceTurn 0.6s infinite alternate; z-index: 65;
+  }
+  #user-fan-area.your-turn-active #user-turn-badge { display: block; }
+
   #user-fan {
     position: relative; width: 100%; max-width: min(96%, 600px); height: 100%;
     display: flex; justify-content: center; align-items: flex-end;
   }
 
-  /* カードサイズ */
+  /* カードスタイル */
   .card {
     width: clamp(72px, 12vw, 92px); height: clamp(105px, 17.5vw, 134px);
     background: #fafafa; border-radius: 7px; box-shadow: 0 3px 8px rgba(0,0,0,0.65);
@@ -356,7 +367,7 @@
     border-radius: 8px; border: 1.5px solid #ccc; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.15);
   }
 
-  /* モーダル共通 */
+  /* モーダル */
   .modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(5, 5, 5, 0.92);
     backdrop-filter: blur(10px); display: flex; justify-content: center; align-items: center; z-index: 200;
@@ -377,11 +388,9 @@
     background: linear-gradient(135deg, var(--gold), #b38924); color: #111; font-size: 13px;
     padding: 9px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: 900; margin: 4px;
   }
-  .modal-btn-sub {
-    background: #34495e; color: #fff; border: 1px solid #7f8c8d;
-  }
+  .modal-btn-sub { background: #34495e; color: #fff; border: 1px solid #7f8c8d; }
 
-  /* ロビー用ルームリスト */
+  /* ロビールームアイテム */
   .lobby-room-item {
     background: rgba(255,255,255,0.06); border: 1px solid rgba(245,205,121,0.3); border-radius: 8px;
     padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;
@@ -435,7 +444,7 @@
     <div>R<span id="round-num" style="color:var(--gold); font-weight:bold;">1</span> <span class="mult-tag" id="multiplier-display">1x</span></div>
     <button class="header-btn" onclick="openScoreHistoryModal()">HISTORY</button>
     <div><b id="user-sum" style="color:var(--gold);">0</b></div>
-    <span class="version-tag" title="Game Version">v2026.00.001</span>
+    <span class="version-tag" title="Game Version">v2026.00.002</span>
   </div>
 </header>
 
@@ -501,8 +510,9 @@
   <button class="btn-skip-round" id="skip-chombo-btn" onclick="skipChomboRound()">SKIP ROUND (-10pt)</button>
 </div>
 
-<!-- ユーザー手札 -->
+<!-- ユーザー手札（自分の番のとき金色ハイライト） -->
 <div id="user-fan-area">
+  <div id="user-turn-badge">▼ YOUR TURN ▼</div>
   <div id="user-fan"></div>
   <img class="user-grip-img" src="me.png" alt="My Hand">
 </div>
@@ -515,12 +525,12 @@
   <button class="suit-btn" style="color:#11141a;" onclick="selectSuit('♣')">♣</button>
 </div>
 
-<!-- スタート画面（モード選択 ＆ バージョン明記） -->
+<!-- スタート画面 -->
 <div class="modal-overlay" id="start-modal">
   <div class="modal-content" style="max-width:92%; width:360px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
       <h2 style="margin:0; color:var(--gold); font-family:Georgia, serif; letter-spacing:1px;">DOBON MASTER</h2>
-      <span class="version-tag">v2026.00.001</span>
+      <span class="version-tag">v2026.00.002</span>
     </div>
     <div style="font-size:10px; color:#888; margin-bottom:12px;">Unofficial Tournament Standard - San Diego Edition</div>
     
@@ -580,7 +590,6 @@
       <div style="font-size:11px; color:#888; text-align:center; padding:15px;">部屋情報を取得中...</div>
     </div>
 
-    <!-- 部屋作成フォーム -->
     <div style="border-top:1px solid rgba(245,205,121,0.3); padding-top:10px; margin-bottom:10px;">
       <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:4px;">新しい部屋を作成:</div>
       <div style="display:flex; gap:6px; margin-bottom:8px;">

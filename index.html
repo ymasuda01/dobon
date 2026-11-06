@@ -380,8 +380,10 @@
 </div>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<!-- キャッシュバスター付きJavaScript -->
-<script src="game.js?v=202600004"></script>
+<!-- 先にローカルエンジン、次にオンラインモジュールを読み込み -->
+<script src="game.js?v=202600005"></script>
+<script src="online.js?v=202600005"></script>
+
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});

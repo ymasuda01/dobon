@@ -1635,18 +1635,23 @@ function toggleMinimizeResult() {
 function nextRound() {
   stopConfetti();
   hideOutcomeBanner();
+  
   const rm = document.getElementById('result-modal');
   if (rm) rm.style.display = 'none';
+  const cm = document.getElementById('championship-modal');
+  if (cm) cm.style.display = 'none';
   const mb = document.getElementById('minimized-restore-bar');
   if (mb) mb.style.display = 'none';
 
-  if (currentRound % 10 === 0) {
+  // 10ラウンドごとのチャンピオンシップ判定を挟むかどうかのチェック
+  if (currentRound > 0 && currentRound % 10 === 0) {
     showChampionshipResult();
   } else {
     currentRound++;
     startRound();
   }
 }
+
 
 function showChampionshipResult() {
   const sorted = [...players].sort((a, b) => b.score - a.score);

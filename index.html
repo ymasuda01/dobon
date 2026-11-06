@@ -7,8 +7,8 @@
 <meta name="version" content="2026.00.004">
 <title>DOBON - Las Vegas VIP Lounge (2026.00.004)</title>
 <link rel="manifest" href="manifest.json">
-<!-- 外部CSSファイルを読み込み -->
-<link rel="stylesheet" href="style.css">
+<!-- キャッシュバスター付きCSS -->
+<link rel="stylesheet" href="style.css?v=202600004">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0806">
@@ -52,9 +52,7 @@
 
 <div id="table-perspective">
   <div id="poker-table">
-    <!-- 観戦中ステータスバナー -->
     <div id="spectator-hud-banner">👁️ SPECTATING (観戦待機中)</div>
-
     <div id="cpu-arc-container"></div>
 
     <div id="dobon-gaeshi-banner">
@@ -131,58 +129,65 @@
   <button class="suit-btn" style="color:#11141a;" onclick="selectSuit('♣')">♣</button>
 </div>
 
-<!-- スタート画面 -->
+<!-- 【完全刷新】スタート画面（ワンタップで迷わず開始できる動線） -->
 <div class="modal-overlay" id="start-modal">
   <div class="modal-content" style="max-width:92%; width:360px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
       <h2 style="margin:0; color:var(--gold); font-family:Georgia, serif; letter-spacing:1px;">DOBON MASTER</h2>
       <span class="version-tag">v2026.00.004</span>
     </div>
-    <div style="font-size:10px; color:#888; margin-bottom:12px;">Unofficial Tournament Standard - San Diego Edition</div>
+    <div style="font-size:10px; color:#888; margin-bottom:14px;">Unofficial Tournament Standard - San Diego Edition</div>
     
-    <div style="display:flex; gap:8px; margin-bottom:12px;">
-      <button class="modal-btn" style="flex:1; padding:12px 6px;" onclick="selectGameMode('cpu')">
-        🤖 一人で遊ぶ<br><span style="font-size:10px; font-weight:normal;">(VS CPU)</span>
-      </button>
-      <button class="modal-btn" style="flex:1; padding:12px 6px; background:#2980b9;" onclick="selectGameMode('online')">
-        🌐 オンライン対戦<br><span style="font-size:10px; font-weight:normal;">(MULTIPLAYER)</span>
-      </button>
-    </div>
+    <!-- メイン開始ボタン2つ（押せば即座に動く！） -->
+    <button class="modal-btn" style="width:100%; padding:14px; font-size:15px; margin-bottom:10px;" onclick="startCpuDirect()">
+      🤖 一人で遊ぶ (VS CPU)
+    </button>
+    <button class="modal-btn" style="width:100%; padding:14px; font-size:15px; background:#2980b9; margin-bottom:12px;" onclick="openLobbyModal()">
+      🌐 オンライン対戦 (MULTIPLAYER)
+    </button>
 
-    <!-- CPU設定パネル -->
-    <div id="cpu-config-panel">
-      <div style="font-size:11px; margin-bottom:4px; text-align:left; color:#a4b0be;" id="lbl-players">参加人数 (あなた + CPU):</div>
-      <select id="player-count-select" style="width:100%; font-size:13px; padding:6px; margin-bottom:8px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
-        <option value="4" selected>4人 (あなた + CPU 3人)</option>
-        <option value="2">2人 (あなた + CPU 1人)</option>
-        <option value="3">3人 (あなた + CPU 2人)</option>
-        <option value="5">5人 (推奨)</option>
-        <option value="6">6人</option>
-      </select>
+    <!-- 中断データがある場合のみ表示 -->
+    <button class="modal-btn modal-btn-sub" id="resume-btn" style="width:100%; padding:10px; margin-bottom:12px; display:none;" onclick="resumeGame()">
+      ▶️ RESUME (前回の続きから再開)
+    </button>
 
-      <div style="font-size:11px; margin-bottom:4px; text-align:left; color:#a4b0be;" id="lbl-chombo">判定モード:</div>
-      <select id="chombo-mode-select" style="width:100%; font-size:13px; padding:6px; margin-bottom:8px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
-        <option value="strict" selected>Strict (Tournament Rules)</option>
-        <option value="assist">Assist (Practice Mode)</option>
-      </select>
+    <!-- 折りたたみ式CPU詳細設定 -->
+    <div style="border-top:1px solid rgba(245,205,121,0.25); padding-top:10px; text-align:left;">
+      <div style="font-size:11px; color:var(--gold); cursor:pointer; font-weight:bold; display:flex; justify-content:space-between;" onclick="toggleConfigAccordion()">
+        <span>⚙️ CPU戦の設定（人数・持ち時間）</span>
+        <span id="config-arrow">▼</span>
+      </div>
+      <div id="cpu-config-panel" style="display:none; margin-top:8px;">
+        <div style="font-size:10px; color:#a4b0be; margin-bottom:2px;">参加人数:</div>
+        <select id="player-count-select" style="width:100%; font-size:12px; padding:5px; margin-bottom:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:4px;">
+          <option value="4" selected>4人 (あなた + CPU 3人)</option>
+          <option value="2">2人 (あなた + CPU 1人)</option>
+          <option value="3">3人 (あなた + CPU 2人)</option>
+          <option value="5">5人 (推奨)</option>
+          <option value="6">6人</option>
+        </select>
 
-      <div style="font-size:11px; margin-bottom:4px; text-align:left; color:#a4b0be;" id="lbl-timer">制限時間 (無制限廃止):</div>
-      <select id="timer-mode-select" style="width:100%; font-size:13px; padding:6px; margin-bottom:14px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
-        <option value="25" selected>25 Seconds (標準)</option>
-        <option value="5">5 Seconds (超速・警告3s)</option>
-        <option value="10">10 Seconds (高速・警告5s)</option>
-        <option value="15">15 Seconds</option>
-        <option value="30">30 Seconds</option>
-        <option value="60">60 Seconds (最大1分)</option>
-      </select>
+        <div style="font-size:10px; color:#a4b0be; margin-bottom:2px;">判定モード:</div>
+        <select id="chombo-mode-select" style="width:100%; font-size:12px; padding:5px; margin-bottom:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:4px;">
+          <option value="strict" selected>Strict (公式トーナメントルール)</option>
+          <option value="assist">Assist (練習モード)</option>
+        </select>
 
-      <button class="modal-btn" style="width:100%; padding:10px;" onclick="startCpuNewGame()">NEW GAME (新規開始)</button>
-      <button class="modal-btn modal-btn-sub" id="resume-btn" style="width:100%; padding:10px; margin-top:8px; display:none;" onclick="resumeGame()">RESUME (中断データから再開)</button>
+        <div style="font-size:10px; color:#a4b0be; margin-bottom:2px;">持ち時間:</div>
+        <select id="timer-mode-select" style="width:100%; font-size:12px; padding:5px; margin-bottom:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:4px;">
+          <option value="25" selected>25 Seconds (標準)</option>
+          <option value="5">5 Seconds (超速・警告3s)</option>
+          <option value="10">10 Seconds (高速・警告5s)</option>
+          <option value="15">15 Seconds</option>
+          <option value="30">30 Seconds</option>
+          <option value="60">60 Seconds (最大1分)</option>
+        </select>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- 【刷新】オンラインロビーモーダル（クイックマッチ・検索・フィルター対応） -->
+<!-- オンラインロビーモーダル -->
 <div class="modal-overlay" id="online-lobby-modal" style="display:none;">
   <div class="modal-content" style="max-width:94%; width:400px; padding:16px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -190,7 +195,7 @@
       <button class="header-btn" onclick="fetchRoomList()">更新 🔄</button>
     </div>
 
-    <!-- メイン導線：クイックマッチボタン -->
+    <!-- クイックマッチボタン -->
     <button class="modal-btn" style="width:100%; background:linear-gradient(135deg,#e67e22,#d35400); color:#fff; padding:12px; font-size:14px; margin-bottom:10px;" onclick="startQuickMatch()">
       ⚡ クイックマッチ (自動マッチング)
     </button>
@@ -200,18 +205,18 @@
       <input type="text" id="lobby-search-query" oninput="filterAndRenderRooms()" placeholder="🔍 部屋名検索..." style="flex:1.5; font-size:12px; padding:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
     </div>
 
-    <!-- 表示フィルター -->
+    <!-- フィルター -->
     <div style="display:flex; gap:6px; margin-bottom:8px; font-size:10px;">
       <button class="header-btn" id="filter-all-btn" style="background:var(--gold); color:#111;" onclick="setLobbyFilter('all')">すべて</button>
       <button class="header-btn" id="filter-open-btn" onclick="setLobbyFilter('open')">すぐ入れる部屋のみ</button>
       <button class="header-btn" id="filter-spec-btn" onclick="setLobbyFilter('spec')">観戦可能</button>
     </div>
 
-    <!-- 最近入った部屋履歴 -->
+    <!-- 最近入った部屋 -->
     <div style="font-size:10px; text-align:left; color:#a4b0be; margin-bottom:2px;">最近入った部屋:</div>
     <div id="recent-rooms-container" style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; min-height:20px;"></div>
 
-    <!-- 部屋一覧リスト（優先度ソート済み） -->
+    <!-- 部屋一覧リスト -->
     <div style="font-size:10px; text-align:left; color:#a4b0be; margin-bottom:4px;">部屋一覧 (タップして入室/観戦):</div>
     <div id="lobby-room-container" style="max-height:140px; overflow-y:auto; margin-bottom:10px; text-align:left;">
       <div style="font-size:11px; color:#888; text-align:center; padding:12px;">部屋情報を取得中...</div>
@@ -280,14 +285,11 @@
   </div>
 </div>
 
-<!-- 進行中ラウンドの流し（ノーゲーム）投票モーダル -->
+<!-- 進行中ラウンドの流し投票モーダル -->
 <div class="modal-overlay" id="vote-abort-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:320px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">JOIN REQUEST</h3>
-    <div id="vote-abort-desc" style="font-size:12px; margin-bottom:12px; line-height:1.5;">
-      待機者が入室しました。<br>現在のラウンドをノーゲームで流し、即座に合流させますか？<br>
-      <span style="font-size:10px; color:#ff7675;">※全員一致で可決（拒否者がいれば続行）</span>
-    </div>
+    <div id="vote-abort-desc" style="font-size:12px; margin-bottom:12px; line-height:1.5;"></div>
     <div style="display:flex; gap:8px;">
       <button class="modal-btn" style="flex:1; background:#27ae60; color:#fff;" onclick="castAbortVote(true)">流して合流</button>
       <button class="modal-btn modal-btn-sub" style="flex:1;" onclick="castAbortVote(false)">現在の回を続行</button>
@@ -295,14 +297,11 @@
   </div>
 </div>
 
-<!-- 卓人数拡張（全会一致）投票モーダル -->
+<!-- 卓人数拡張投票モーダル -->
 <div class="modal-overlay" id="vote-expand-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:320px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">TABLE EXPAND</h3>
-    <div id="vote-expand-desc" style="font-size:12px; margin-bottom:12px; line-height:1.5;">
-      規定人数を超えるプレイヤーが参加希望しています。<br>卓の定員を拡張して参加を許可しますか？<br>
-      <span style="font-size:10px; color:#ff7675;">※全会一致で拡張可決</span>
-    </div>
+    <div id="vote-expand-desc" style="font-size:12px; margin-bottom:12px; line-height:1.5;"></div>
     <div style="display:flex; gap:8px;">
       <button class="modal-btn" style="flex:1; background:#27ae60; color:#fff;" onclick="castExpandVote(true)">拡張を許可</button>
       <button class="modal-btn modal-btn-sub" style="flex:1;" onclick="castExpandVote(false)">規定人数を維持</button>
@@ -365,4 +364,28 @@
   <div class="modal-content">
     <h2 style="margin:2px 0 8px; color:var(--gold); font-family:Georgia, serif;">★ CHAMPIONSHIP RESULT ★</h2>
     <div id="champ-rankings" style="text-align:left; font-size:12px; line-height:1.6; margin:10px 0; max-height:200px; overflow-y:auto;"></div>
-    <button cl
+    <button class="modal-btn" style="background:#27ae60; color:#fff;" onclick="continueChampionship()">CONTINUE (ROUND 11~)</button>
+    <button class="modal-btn" style="background:#e67e22; color:#fff;" onclick="resetChampionship()">RESET & RESTART</button>
+    <button class="modal-btn" style="background:#7f8c8d; color:#fff;" onclick="quitToTitle()">QUIT TO TITLE</button>
+  </div>
+</div>
+
+<!-- 履歴モーダル -->
+<div class="modal-overlay" id="history-modal" style="display:none;">
+  <div class="modal-content" style="max-width:96%; width:440px;">
+    <h3 style="margin:2px 0 6px; color:var(--gold);">CHAMPIONSHIP HISTORY</h3>
+    <div id="accordion-history-container" style="max-height:280px; overflow-y:auto; text-align:left;"></div>
+    <button class="modal-btn" style="margin-top:8px;" onclick="closeScoreHistoryModal()">CLOSE</button>
+  </div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<!-- キャッシュバスター付きJavaScript -->
+<script src="game.js?v=202600004"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>

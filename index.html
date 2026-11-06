@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="application-name" content="DOBON Master">
-<meta name="version" content="2026.00.004">
-<title>DOBON - Las Vegas VIP Lounge (2026.00.004)</title>
+<meta name="version" content="2026.00.005">
+<title>DOBON - Las Vegas VIP Lounge (2026.00.005)</title>
 <link rel="manifest" href="manifest.json">
 <!-- キャッシュバスター付きCSS -->
-<link rel="stylesheet" href="style.css?v=202600004">
+<link rel="stylesheet" href="style.css?v=202600005">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0806">
@@ -41,7 +41,7 @@
     <div>R<span id="round-num" style="color:var(--gold); font-weight:bold;">1</span> <span class="mult-tag" id="multiplier-display">1x</span></div>
     <button class="header-btn" onclick="openScoreHistoryModal()">HISTORY</button>
     <div><b id="user-sum" style="color:var(--gold);">0</b></div>
-    <span class="version-tag" title="Game Version">v2026.00.004</span>
+    <span class="version-tag" title="Game Version">v2026.00.005</span>
   </div>
 </header>
 
@@ -129,16 +129,15 @@
   <button class="suit-btn" style="color:#11141a;" onclick="selectSuit('♣')">♣</button>
 </div>
 
-<!-- 【完全刷新】スタート画面（ワンタップで迷わず開始できる動線） -->
+<!-- スタート画面 -->
 <div class="modal-overlay" id="start-modal">
   <div class="modal-content" style="max-width:92%; width:360px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
       <h2 style="margin:0; color:var(--gold); font-family:Georgia, serif; letter-spacing:1px;">DOBON MASTER</h2>
-      <span class="version-tag">v2026.00.004</span>
+      <span class="version-tag">v2026.00.005</span>
     </div>
     <div style="font-size:10px; color:#888; margin-bottom:14px;">Unofficial Tournament Standard - San Diego Edition</div>
     
-    <!-- メイン開始ボタン2つ（押せば即座に動く！） -->
     <button class="modal-btn" style="width:100%; padding:14px; font-size:15px; margin-bottom:10px;" onclick="startCpuDirect()">
       🤖 一人で遊ぶ (VS CPU)
     </button>
@@ -146,12 +145,10 @@
       🌐 オンライン対戦 (MULTIPLAYER)
     </button>
 
-    <!-- 中断データがある場合のみ表示 -->
     <button class="modal-btn modal-btn-sub" id="resume-btn" style="width:100%; padding:10px; margin-bottom:12px; display:none;" onclick="resumeGame()">
       ▶️ RESUME (前回の続きから再開)
     </button>
 
-    <!-- 折りたたみ式CPU詳細設定 -->
     <div style="border-top:1px solid rgba(245,205,121,0.25); padding-top:10px; text-align:left;">
       <div style="font-size:11px; color:var(--gold); cursor:pointer; font-weight:bold; display:flex; justify-content:space-between;" onclick="toggleConfigAccordion()">
         <span>⚙️ CPU戦の設定（人数・持ち時間）</span>
@@ -195,7 +192,6 @@
       <button class="header-btn" onclick="fetchRoomList()">更新 🔄</button>
     </div>
 
-    <!-- クイックマッチボタン -->
     <button class="modal-btn" style="width:100%; background:linear-gradient(135deg,#e67e22,#d35400); color:#fff; padding:12px; font-size:14px; margin-bottom:10px;" onclick="startQuickMatch()">
       ⚡ クイックマッチ (自動マッチング)
     </button>
@@ -205,24 +201,20 @@
       <input type="text" id="lobby-search-query" oninput="filterAndRenderRooms()" placeholder="🔍 部屋名検索..." style="flex:1.5; font-size:12px; padding:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
     </div>
 
-    <!-- フィルター -->
     <div style="display:flex; gap:6px; margin-bottom:8px; font-size:10px;">
       <button class="header-btn" id="filter-all-btn" style="background:var(--gold); color:#111;" onclick="setLobbyFilter('all')">すべて</button>
       <button class="header-btn" id="filter-open-btn" onclick="setLobbyFilter('open')">すぐ入れる部屋のみ</button>
       <button class="header-btn" id="filter-spec-btn" onclick="setLobbyFilter('spec')">観戦可能</button>
     </div>
 
-    <!-- 最近入った部屋 -->
     <div style="font-size:10px; text-align:left; color:#a4b0be; margin-bottom:2px;">最近入った部屋:</div>
     <div id="recent-rooms-container" style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; min-height:20px;"></div>
 
-    <!-- 部屋一覧リスト -->
     <div style="font-size:10px; text-align:left; color:#a4b0be; margin-bottom:4px;">部屋一覧 (タップして入室/観戦):</div>
     <div id="lobby-room-container" style="max-height:140px; overflow-y:auto; margin-bottom:10px; text-align:left;">
       <div style="font-size:11px; color:#888; text-align:center; padding:12px;">部屋情報を取得中...</div>
     </div>
 
-    <!-- 部屋作成フォーム -->
     <div style="border-top:1px solid rgba(245,205,121,0.3); padding-top:8px; margin-bottom:8px; text-align:left;">
       <div style="font-size:11px; color:#a4b0be; margin-bottom:4px; font-weight:bold;">新しい部屋を作成:</div>
       <div style="display:flex; gap:4px; margin-bottom:6px;">
@@ -380,8 +372,9 @@
 </div>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<!-- キャッシュバスター付きJavaScript -->
-<script src="game.js?v=202600004"></script>
+<!-- 分割された通信スクリプト ＆ メインゲームスクリプト -->
+<script src="online.js?v=202600005"></script>
+<script src="game.js?v=202600005"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});

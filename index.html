@@ -4,9 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="application-name" content="DOBON Master">
-<meta name="version" content="2026.00.003">
-<title>DOBON - Las Vegas VIP Lounge (2026.00.003)</title>
+<meta name="version" content="2026.00.004">
+<title>DOBON - Las Vegas VIP Lounge (2026.00.004)</title>
 <link rel="manifest" href="manifest.json">
+<!-- 外部CSSファイルを読み込み -->
 <link rel="stylesheet" href="style.css">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -40,7 +41,7 @@
     <div>R<span id="round-num" style="color:var(--gold); font-weight:bold;">1</span> <span class="mult-tag" id="multiplier-display">1x</span></div>
     <button class="header-btn" onclick="openScoreHistoryModal()">HISTORY</button>
     <div><b id="user-sum" style="color:var(--gold);">0</b></div>
-    <span class="version-tag" title="Game Version">v2026.00.003</span>
+    <span class="version-tag" title="Game Version">v2026.00.004</span>
   </div>
 </header>
 
@@ -51,6 +52,9 @@
 
 <div id="table-perspective">
   <div id="poker-table">
+    <!-- 観戦中ステータスバナー -->
+    <div id="spectator-hud-banner">👁️ SPECTATING (観戦待機中)</div>
+
     <div id="cpu-arc-container"></div>
 
     <div id="dobon-gaeshi-banner">
@@ -111,7 +115,7 @@
   <button class="btn-skip-round" id="skip-chombo-btn" onclick="skipChomboRound()">SKIP ROUND (-10pt)</button>
 </div>
 
-<!-- ユーザー手札（自分の番のとき金色ハイライト） -->
+<!-- ユーザー手札 -->
 <div id="user-fan-area">
   <div id="user-turn-badge">▼ YOUR TURN ▼</div>
   <div id="user-fan"></div>
@@ -132,11 +136,11 @@
   <div class="modal-content" style="max-width:92%; width:360px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
       <h2 style="margin:0; color:var(--gold); font-family:Georgia, serif; letter-spacing:1px;">DOBON MASTER</h2>
-      <span class="version-tag">v2026.00.003</span>
+      <span class="version-tag">v2026.00.004</span>
     </div>
     <div style="font-size:10px; color:#888; margin-bottom:12px;">Unofficial Tournament Standard - San Diego Edition</div>
     
-    <div style="display:flex; gap:8px; margin-bottom:14px;">
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
       <button class="modal-btn" style="flex:1; padding:12px 6px;" onclick="selectGameMode('cpu')">
         🤖 一人で遊ぶ<br><span style="font-size:10px; font-weight:normal;">(VS CPU)</span>
       </button>
@@ -162,13 +166,14 @@
         <option value="assist">Assist (Practice Mode)</option>
       </select>
 
-      <div style="font-size:11px; margin-bottom:4px; text-align:left; color:#a4b0be;" id="lbl-timer">制限時間:</div>
+      <div style="font-size:11px; margin-bottom:4px; text-align:left; color:#a4b0be;" id="lbl-timer">制限時間 (無制限廃止):</div>
       <select id="timer-mode-select" style="width:100%; font-size:13px; padding:6px; margin-bottom:14px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
-        <option value="0" selected>Unlimited (時間無制限)</option>
-        <option value="5">5 Seconds (Warning at 3s)</option>
-        <option value="10">10 Seconds (Warning at 5s)</option>
+        <option value="25" selected>25 Seconds (標準)</option>
+        <option value="5">5 Seconds (超速・警告3s)</option>
+        <option value="10">10 Seconds (高速・警告5s)</option>
         <option value="15">15 Seconds</option>
-        <option value="20">20 Seconds</option>
+        <option value="30">30 Seconds</option>
+        <option value="60">60 Seconds (最大1分)</option>
       </select>
 
       <button class="modal-btn" style="width:100%; padding:10px;" onclick="startCpuNewGame()">NEW GAME (新規開始)</button>
@@ -177,65 +182,131 @@
   </div>
 </div>
 
-<!-- オンラインロビーモーダル -->
+<!-- 【刷新】オンラインロビーモーダル（クイックマッチ・検索・フィルター対応） -->
 <div class="modal-overlay" id="online-lobby-modal" style="display:none;">
-  <div class="modal-content" style="max-width:92%; width:380px;">
-    <h3 style="margin:2px 0 10px; color:var(--gold);">ONLINE LOBBY</h3>
-
-    <div style="display:flex; gap:6px; margin-bottom:10px;">
-      <input type="text" id="lobby-player-name" value="YOU" placeholder="プレイヤー名" style="flex:1; font-size:13px; padding:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
+  <div class="modal-content" style="max-width:94%; width:400px; padding:16px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <h3 style="margin:0; color:var(--gold);">ONLINE LOBBY</h3>
       <button class="header-btn" onclick="fetchRoomList()">更新 🔄</button>
     </div>
 
-    <!-- 最近入った部屋履歴 -->
-    <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:4px;">最近入った部屋:</div>
-    <div id="recent-rooms-container" style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; min-height:22px;"></div>
+    <!-- メイン導線：クイックマッチボタン -->
+    <button class="modal-btn" style="width:100%; background:linear-gradient(135deg,#e67e22,#d35400); color:#fff; padding:12px; font-size:14px; margin-bottom:10px;" onclick="startQuickMatch()">
+      ⚡ クイックマッチ (自動マッチング)
+    </button>
 
-    <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:6px;">対局部屋一覧 (タップして入室):</div>
-    <div id="lobby-room-container" style="max-height:160px; overflow-y:auto; margin-bottom:12px; text-align:left;">
-      <div style="font-size:11px; color:#888; text-align:center; padding:15px;">部屋情報を取得中...</div>
+    <div style="display:flex; gap:6px; margin-bottom:8px;">
+      <input type="text" id="lobby-player-name" value="YOU" placeholder="プレイヤー名" style="flex:1; font-size:12px; padding:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
+      <input type="text" id="lobby-search-query" oninput="filterAndRenderRooms()" placeholder="🔍 部屋名検索..." style="flex:1.5; font-size:12px; padding:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
     </div>
 
-    <div style="border-top:1px solid rgba(245,205,121,0.3); padding-top:10px; margin-bottom:10px;">
-      <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:4px;">新しい部屋を作成:</div>
-      <div style="display:flex; gap:6px; margin-bottom:8px;">
-        <input type="text" id="create-room-name" placeholder="部屋名 (例: VIP Room)" style="flex:2; font-size:12px; padding:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
-        <select id="create-room-max" style="flex:1; font-size:12px; padding:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
+    <!-- 表示フィルター -->
+    <div style="display:flex; gap:6px; margin-bottom:8px; font-size:10px;">
+      <button class="header-btn" id="filter-all-btn" style="background:var(--gold); color:#111;" onclick="setLobbyFilter('all')">すべて</button>
+      <button class="header-btn" id="filter-open-btn" onclick="setLobbyFilter('open')">すぐ入れる部屋のみ</button>
+      <button class="header-btn" id="filter-spec-btn" onclick="setLobbyFilter('spec')">観戦可能</button>
+    </div>
+
+    <!-- 最近入った部屋履歴 -->
+    <div style="font-size:10px; text-align:left; color:#a4b0be; margin-bottom:2px;">最近入った部屋:</div>
+    <div id="recent-rooms-container" style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; min-height:20px;"></div>
+
+    <!-- 部屋一覧リスト（優先度ソート済み） -->
+    <div style="font-size:10px; text-align:left; color:#a4b0be; margin-bottom:4px;">部屋一覧 (タップして入室/観戦):</div>
+    <div id="lobby-room-container" style="max-height:140px; overflow-y:auto; margin-bottom:10px; text-align:left;">
+      <div style="font-size:11px; color:#888; text-align:center; padding:12px;">部屋情報を取得中...</div>
+    </div>
+
+    <!-- 部屋作成フォーム -->
+    <div style="border-top:1px solid rgba(245,205,121,0.3); padding-top:8px; margin-bottom:8px; text-align:left;">
+      <div style="font-size:11px; color:#a4b0be; margin-bottom:4px; font-weight:bold;">新しい部屋を作成:</div>
+      <div style="display:flex; gap:4px; margin-bottom:6px;">
+        <input type="text" id="create-room-name" placeholder="部屋名" style="flex:2; font-size:12px; padding:5px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
+        <select id="create-room-max" style="flex:1; font-size:11px; padding:5px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
           <option value="4" selected>4人卓</option>
           <option value="2">2人卓</option>
           <option value="3">3人卓</option>
           <option value="5">5人卓</option>
+          <option value="6">6人卓</option>
+        </select>
+        <select id="create-room-time" style="flex:1.2; font-size:11px; padding:5px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
+          <option value="25" selected>25秒</option>
+          <option value="5">5秒</option>
+          <option value="10">10秒</option>
+          <option value="15">15秒</option>
+          <option value="30">30秒</option>
+          <option value="60">1分(60s)</option>
         </select>
       </div>
-      <button class="modal-btn" style="width:100%; background:#27ae60; color:#fff; padding:9px;" onclick="createOnlineRoom()">部屋を作成して待機</button>
+      <div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+        <label style="font-size:11px; display:flex; align-items:center; gap:4px; cursor:pointer;">
+          <input type="checkbox" id="create-room-private" onchange="togglePrivatePasswordInput()"> 鍵部屋(パスワード)
+        </label>
+        <input type="password" id="create-room-pass" placeholder="合言葉" style="flex:1; font-size:11px; padding:4px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px; display:none;">
+      </div>
+      <button class="modal-btn" style="width:100%; background:#27ae60; color:#fff; padding:8px;" onclick="createOnlineRoom()">部屋を作成して待機</button>
     </div>
 
     <button class="modal-btn modal-btn-sub" style="width:100%;" onclick="closeLobbyModal()">戻る</button>
   </div>
 </div>
 
+<!-- パスワード入力モーダル -->
+<div class="modal-overlay" id="password-input-modal" style="display:none;">
+  <div class="modal-content" style="max-width:92%; width:300px;">
+    <h3 style="margin:2px 0 8px; color:var(--gold);">PASSWORD</h3>
+    <div style="font-size:11px; margin-bottom:8px; color:#aaa;">合言葉(パスワード)を入力してください</div>
+    <input type="password" id="room-join-password" placeholder="パスワード" style="width:100%; font-size:14px; padding:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px; margin-bottom:12px;">
+    <button class="modal-btn" style="width:100%; background:#27ae60; color:#fff;" onclick="submitRoomPassword()">入室する</button>
+    <button class="modal-btn modal-btn-sub" style="width:100%; margin-top:6px;" onclick="closePasswordModal()">キャンセル</button>
+  </div>
+</div>
+
 <!-- 部屋待機画面モーダル -->
 <div class="modal-overlay" id="room-detail-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:340px;">
-    <h3 id="room-detail-title" style="margin:2px 0 6px; color:var(--gold);">WAITING ROOM</h3>
-    <div id="room-detail-desc" style="font-size:11px; color:#aaa; margin-bottom:10px;"></div>
+    <h3 id="room-detail-title" style="margin:2px 0 4px; color:var(--gold);">WAITING ROOM</h3>
+    <div id="room-detail-desc" style="font-size:11px; color:#aaa; margin-bottom:8px;"></div>
 
-    <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:4px;">参加メンバー:</div>
-    <div id="room-detail-players" style="font-size:13px; line-height:1.8; text-align:left; margin-bottom:12px; background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:6px;"></div>
+    <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:4px;">参加プレイヤー:</div>
+    <div id="room-detail-players" style="font-size:12px; line-height:1.7; text-align:left; margin-bottom:8px; background:rgba(255,255,255,0.05); padding:6px 10px; border-radius:6px;"></div>
 
-    <div style="font-size:10px; color:#f5cd79; margin-bottom:10px;">※人数が満たない場合は不足枠にCPUが自動追加されます</div>
-    <button class="modal-btn" style="width:100%; background:#27ae60; color:#fff; padding:10px;" onclick="requestStartOnlineGame()">対局開始 (ゲームスタート)</button>
+    <div style="font-size:11px; text-align:left; color:#a4b0be; margin-bottom:4px;">観戦者:</div>
+    <div id="room-detail-spectators" style="font-size:11px; color:#888; text-align:left; margin-bottom:10px; min-height:16px;">なし</div>
+
+    <div style="font-size:10px; color:#f5cd79; margin-bottom:10px;">※開始時に人数不足の場合、不足枠をCPUが自動補完します</div>
+    <button class="modal-btn" id="btn-start-sync-game" style="width:100%; background:#27ae60; color:#fff; padding:10px;" onclick="requestStartOnlineGame()">対局開始 (ゲームスタート)</button>
     <button class="modal-btn modal-btn-sub" style="width:100%; margin-top:6px;" onclick="leaveRoomAndBackToLobby()">退室してロビーへ</button>
   </div>
 </div>
 
-<!-- 誰か抜けた時の選択モーダル -->
-<div class="modal-overlay" id="player-left-modal" style="display:none;">
-  <div class="modal-content" style="max-width:92%; width:340px;">
-    <h3 style="margin:2px 0 8px; color:#e74c3c;">PLAYER DISCONNECTED</h3>
-    <div id="player-left-desc" style="font-size:12px; margin-bottom:12px; line-height:1.5;"></div>
-    <button class="modal-btn" style="width:100%; background:#27ae60; color:#fff;" onclick="resolvePlayerLeft('cpu')">🤖 CPUに代行させる</button>
-    <button class="modal-btn modal-btn-sub" style="width:100%; margin-top:8px;" onclick="resolvePlayerLeft('reduce')">👥 人数を減らして続行</button>
+<!-- 進行中ラウンドの流し（ノーゲーム）投票モーダル -->
+<div class="modal-overlay" id="vote-abort-modal" style="display:none;">
+  <div class="modal-content" style="max-width:92%; width:320px;">
+    <h3 style="margin:2px 0 6px; color:var(--gold);">JOIN REQUEST</h3>
+    <div id="vote-abort-desc" style="font-size:12px; margin-bottom:12px; line-height:1.5;">
+      待機者が入室しました。<br>現在のラウンドをノーゲームで流し、即座に合流させますか？<br>
+      <span style="font-size:10px; color:#ff7675;">※全員一致で可決（拒否者がいれば続行）</span>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="modal-btn" style="flex:1; background:#27ae60; color:#fff;" onclick="castAbortVote(true)">流して合流</button>
+      <button class="modal-btn modal-btn-sub" style="flex:1;" onclick="castAbortVote(false)">現在の回を続行</button>
+    </div>
+  </div>
+</div>
+
+<!-- 卓人数拡張（全会一致）投票モーダル -->
+<div class="modal-overlay" id="vote-expand-modal" style="display:none;">
+  <div class="modal-content" style="max-width:92%; width:320px;">
+    <h3 style="margin:2px 0 6px; color:var(--gold);">TABLE EXPAND</h3>
+    <div id="vote-expand-desc" style="font-size:12px; margin-bottom:12px; line-height:1.5;">
+      規定人数を超えるプレイヤーが参加希望しています。<br>卓の定員を拡張して参加を許可しますか？<br>
+      <span style="font-size:10px; color:#ff7675;">※全会一致で拡張可決</span>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="modal-btn" style="flex:1; background:#27ae60; color:#fff;" onclick="castExpandVote(true)">拡張を許可</button>
+      <button class="modal-btn modal-btn-sub" style="flex:1;" onclick="castExpandVote(false)">規定人数を維持</button>
+    </div>
   </div>
 </div>
 
@@ -250,7 +321,7 @@
     <div style="display:flex; justify-content:center; gap:4px; margin-top:8px;">
       <button class="modal-btn" onclick="openScoreHistoryModal()">HISTORY</button>
       <button class="modal-btn" onclick="suspendGame()">SUSPEND (中断)</button>
-      <button class="modal-btn" onclick="requestNextRound()">NEXT ROUND</button>
+      <button class="modal-btn" id="btn-next-round-main" onclick="requestNextRound()">NEXT ROUND</button>
     </div>
   </div>
 </div>
@@ -294,27 +365,4 @@
   <div class="modal-content">
     <h2 style="margin:2px 0 8px; color:var(--gold); font-family:Georgia, serif;">★ CHAMPIONSHIP RESULT ★</h2>
     <div id="champ-rankings" style="text-align:left; font-size:12px; line-height:1.6; margin:10px 0; max-height:200px; overflow-y:auto;"></div>
-    <button class="modal-btn" style="background:#27ae60; color:#fff;" onclick="continueChampionship()">CONTINUE (ROUND 11~)</button>
-    <button class="modal-btn" style="background:#e67e22; color:#fff;" onclick="resetChampionship()">RESET & RESTART</button>
-    <button class="modal-btn" style="background:#7f8c8d; color:#fff;" onclick="quitToTitle()">QUIT TO TITLE</button>
-  </div>
-</div>
-
-<!-- 履歴モーダル -->
-<div class="modal-overlay" id="history-modal" style="display:none;">
-  <div class="modal-content" style="max-width:96%; width:440px;">
-    <h3 style="margin:2px 0 6px; color:var(--gold);">CHAMPIONSHIP HISTORY</h3>
-    <div id="accordion-history-container" style="max-height:280px; overflow-y:auto; text-align:left;"></div>
-    <button class="modal-btn" style="margin-top:8px;" onclick="closeScoreHistoryModal()">CLOSE</button>
-  </div>
-</div>
-
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script src="game.js"></script>
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  }
-</script>
-</body>
-</html>
+    <button cl

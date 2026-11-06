@@ -1,377 +1,2334 @@
-/* DOBON Master - Core Game Logic (Restored Picture Card Images) */
-const VERSION = "2026.00.005";
+/**
+ * DOBON MASTER - Las Vegas VIP Lounge Engine
+ * Game Version: 2026.00.004
+ * File Version: game.js v0.1.4
+ */
 
-// グローバル状態
-let deck = [];
-let players = [];
-let currentPlayerIndex = 0;
-let playDirection = 1; // 1: 時計回り, -1: 反時計回り
-let currentDiscard = null;
-let currentSuit = '';
-let isGameActive = false;
-let isMyTurn = false;
-let roundNumber = 1;
-let currentMultiplier = 1;
-let drawStackCount = 0;
-let chomboPlayer = null;
-let selectedHandIndices = [];
+const GAME_VERSION = "2026.00.004";
+const FILE_VERSION = "game.js v0.1.4";
+console.log(`[DOBON Engine Loaded] Game: ${GAME_VERSION} | File: ${FILE_VERSION}`);
 
-// タイマー関連
-let turnTimer = null;
-let maxTurnTime = 25;
-let remainingTime = 25;
+const I18N = {
+  ja: {
+    ready: '準備完了', yourTurn: 'あなたの番です！', cpuThinking: '思考中...',
+    opponentThinking: '相手の手番です。操作を待っています...',
+    spectatorWatching: '【観戦中】次のラウンド開始時に合流します',
+    skipContinued: 'Aでスキップ成功！あなたの手番が続きます！',
+    skipByOpponent: '相手のAでスキップされました！相手の手番が続きます...',
+    dirCCW: '反時計回り', dirCW: '時計回り', chooseSuit: '指定マークを選択',
+    chomboWrongLast: '手札が3枚以上あるのに「LAST」状態でカードを出しました（チョンボ）',
+    chomboMissLast: '「LAST」未宣言のまま次の手番に進んだか、上がろうとしました（チョンボ）',
+    chomboSingleCardDobon: '手札1枚でのドボンは禁止されています（手札1枚ドボンチョンボ）',
+    timeoutMsg: '制限時間以内に行動しませんでした（時間切れチョンボ）',
+    skipChomboPrompt: '上がり禁止ペナルティを解除しました (-10pt)',
+    savedMsg: '対局状態を中断保存しました。',
+    nakiFailed: 'を宣言しましたがカードを揃えられませんでした（チョンボ）',
+    suitChanged: 'マークを {suit} に指定しました',
+    drewCards: '累積 {count}枚 を引きました', drewOne: '山札から1枚引きました',
+    lastCanceled: '山札を引いたため、ラスト宣言が解除されました',
+    lastStandby: '「LAST」スタンバイ中', lastReset: '「LAST」を解除しました',
+    ponKanSelect: 'カードを選んでCONFIRMを押してください'
+  },
+  en: {
+    ready: 'READY', yourTurn: 'Your Turn!', cpuThinking: 'Thinking...',
+    opponentThinking: 'Waiting for opponent...',
+    spectatorWatching: '[SPECTATING] Joining at next round...',
+    skipContinued: 'Skip! Your turn continues!',
+    skipByOpponent: 'Skipped by opponent! Their turn continues...',
+    dirCCW: 'Counter-Clockwise', dirCW: 'Clockwise', chooseSuit: 'SELECT SUIT',
+    chomboWrongLast: 'Played while LAST was active with 3 or more cards (Chombo)',
+    chomboMissLast: 'Failed to declare LAST before proceeding or finishing (Chombo)',
+    chomboSingleCardDobon: 'Dobon with only 1 card left is strictly prohibited (Chombo)',
+    timeoutMsg: 'Did not play within time limit (Timeout Chombo)',
+    skipChomboPrompt: 'Lifted win-ban penalty (-10pt applied)',
+    savedMsg: 'Game progress has been suspended and saved.',
+    nakiFailed: 'called but failed to produce cards (Chombo)',
+    suitChanged: 'Suit changed to {suit}',
+    drewCards: 'Drew {count} stacked cards', drewOne: 'Drew 1 card from deck',
+    lastCanceled: 'Drew from deck: LAST declaration reset',
+    lastStandby: 'LAST armed', lastReset: 'LAST canceled',
+    ponKanSelect: 'Select cards and press CONFIRM'
+  }
+};
 
-// 設定
-let configPlayerCount = 4;
-let configChomboMode = 'strict';
+let currentLang = 'ja';
 
-// 初期化
+const SUITS = ['♠', '♥', '♦', '♣'];
+const VALUES = [
+  { label: 'A', val: 1 }, { label: '2', val: 2 }, { label: '3', val: 3 },
+  { label: '4', val: 4 }, { label: '5', val: 5 }, { label: '6', val: 6 },
+  { label: '7', val: 7 }, { label: '8', val: 8 }, { label: '9', val: 9 },
+  { label: '10', val: 10 }, { label: 'J', val: 11 }, { label: 'Q', val: 12 }, { label: 'K', val: 13 }
+];
+
+const PHOTO_CARDS = {
+  '♠_A': 'spadeA.jpg',
+  '♠_J': 'spadeJ.jpg', '♠_Q': 'spadeQ.jpg', '♠_K': 'spadeK.jpg',
+  '♥_J': 'heartJ.jpg', '♥_Q': 'heartQ.jpg', '♥_K': 'heartK.jpg',
+  '♦_J': 'diamondJ.jpg', '♦_Q': 'diamondQ.jpg', '♦_K': 'diamondK.jpg',
+  '♣_J': 'clubJ.jpg', '♣_Q': 'clubQ.jpg', '♣_K': 'clubK.jpg'
+};
+
+let numPlayers = 4, chomboMode = 'strict', userTimeLimit = 25;
+let players = [], deck = [], discardHistory = [], lastActionDiscard = null;
+let turnIndex = 0, direction = -1, currentRound = 1, currentSet = 1;
+let roundMultiplier = 1, drawTwoStack = 0, designatedSuit = null;
+let isGameOver = false, turnTimer = null, remainingTime = 0;
+let setScoreHistory = [];
+let activeNakiType = null, selectedIndices = [], nextRoundStarter = 0;
+let pendingLastCheck = false, userLastWarningCount = 0;
+
+// オンライン通信・ロビー・観戦管理
+const SERVER_URL = 'https://dobon-server-cdpg.onrender.com';
+let socket = null;
+let currentRoomId = null;
+let isOnlineMatch = false;
+let isSpectator = false;
+let myOnlineSeatIndex = 0;
+let currentOnlineTurnSeat = 0;
+let cachedLobbyRooms = [];
+let currentLobbyFilter = 'all';
+let pendingPasswordRoomId = null;
+
+// ドボン返し猶予
+let dobonStandbyTimer = null, dobonStandbySec = 10, pendingDobonData = null;
+let consecutivePassCount = 0;
+
+// Web Audio API
+let audioCtx = null;
+function getAudioContext() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playCardSnapSound() {
+  try {
+    const ctx = getAudioContext(), osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(220, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.45, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.08);
+  } catch (e) {}
+}
+
+function playDealSound() {
+  try {
+    const ctx = getAudioContext(), bSize = ctx.sampleRate * 0.04;
+    const buf = ctx.createBuffer(1, bSize, ctx.sampleRate), out = buf.getChannelData(0);
+    for (let i = 0; i < bSize; i++) out[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const flt = ctx.createBiquadFilter(); flt.type = 'bandpass'; flt.frequency.value = 1200;
+    const g = ctx.createGain(); g.gain.setValueAtTime(0.2, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.04);
+    src.connect(flt); flt.connect(g); g.connect(ctx.destination);
+    src.start();
+  } catch (e) {}
+}
+
+function speakVoice(text) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const uttr = new SpeechSynthesisUtterance(text);
+  uttr.lang = currentLang === 'ja' ? 'ja-JP' : 'en-US';
+  uttr.rate = 1.15;
+  window.speechSynthesis.speak(uttr);
+}
+
+function triggerFlash() {
+  const f = document.getElementById('flash-overlay');
+  if (f) { f.classList.add('active'); setTimeout(() => f.classList.remove('active'), 80); }
+}
+
+function showOutcomeBanner(isWin) {
+  const b = document.getElementById('round-outcome-banner');
+  if (!b) return;
+  if (isWin) {
+    b.innerText = 'WINNER!'; b.className = 'winner show'; startConfetti();
+  } else {
+    b.innerText = 'LOSE...'; b.className = 'lose show';
+    document.body.classList.add('shake-screen');
+    setTimeout(() => document.body.classList.remove('shake-screen'), 500);
+  }
+}
+
+function hideOutcomeBanner() {
+  const b = document.getElementById('round-outcome-banner');
+  if (b) { b.className = ''; b.innerText = ''; }
+}
+
+function showChomboDoubleBanner(offenderName, newMult) {
+  const b = document.getElementById('chombo-double-banner');
+  const d = document.getElementById('chombo-offender-desc');
+  if (!b) return;
+  if (d) d.innerText = `${offenderName} の反則により全員へ点数支払い ＆ 次回倍率が【${newMult}x】に累積！`;
+  b.classList.add('show');
+  document.body.classList.add('shake-screen');
+  setTimeout(() => document.body.classList.remove('shake-screen'), 500);
+  setTimeout(() => b.classList.remove('show'), 3800);
+}
+
+let confettiAnimationId = null;
+function startConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  if (!canvas) return;
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  canvas.style.display = 'block';
+  const ctx = canvas.getContext('2d'), pieces = [];
+  const colors = ['#f5cd79', '#e74c3c', '#2ecc71', '#3498db', '#9b59b6', '#ffffff'];
+  const centerX = canvas.width / 2, centerY = canvas.height * 0.44;
+
+  for (let i = 0; i < 140; i++) {
+    const angle = Math.random() * Math.PI * 2, speed = Math.random() * 12 + 6;
+    pieces.push({
+      x: centerX, y: centerY,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 4,
+      size: Math.random() * 9 + 5, color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * 360, rotSpeed: Math.random() * 10 - 5,
+      gravity: 0.28, drag: 0.96
+    });
+  }
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pieces.forEach(p => {
+      p.vx *= p.drag; p.vy *= p.drag;
+      p.vy += p.gravity;
+      p.x += p.vx; p.y += p.vy;
+      p.rotation += p.rotSpeed;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate((p.angle * Math.PI) / 180);
+      ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+      ctx.restore();
+    });
+    confettiAnimationId = requestAnimationFrame(draw);
+  }
+  cancelAnimationFrame(confettiAnimationId); draw();
+}
+
+function stopConfetti() {
+  cancelAnimationFrame(confettiAnimationId);
+  const canvas = document.getElementById('confetti-canvas');
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    canvas.style.display = 'none';
+  }
+}
+
+function createDeck52() {
+  deck = [];
+  for (let s of SUITS) {
+    for (let v of VALUES) {
+      deck.push({ suit: s, label: v.label, val: v.val, color: (s === '♥' || s === '♦') ? 'red' : 'black' });
+    }
+  }
+  for (let i = deck.length - 1; i > 0; i--) {
+    const r = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[r]] = [deck[r], deck[i]];
+  }
+}
+
+function toggleLang() {
+  currentLang = currentLang === 'ja' ? 'en' : 'ja';
+  const lBtn = document.getElementById('lang-btn');
+  if (lBtn) lBtn.innerText = currentLang === 'ja' ? 'EN' : 'JP';
+  const cSuit = document.getElementById('txt-choose-suit');
+  if (cSuit) cSuit.innerText = I18N[currentLang].chooseSuit;
+  updateUI();
+}
+
+function openPayoutModal() { 
+  const m = document.getElementById('payout-modal');
+  if (m) m.style.display = 'flex'; 
+}
+function closePayoutModal() { 
+  const m = document.getElementById('payout-modal');
+  if (m) m.style.display = 'none'; 
+}
+
+function suspendGame() {
+  const save = {
+    numPlayers, chomboMode, userTimeLimit, currentRound, currentSet, roundMultiplier,
+    direction, turnIndex, drawTwoStack, designatedSuit, players, deck, discardHistory,
+    lastActionDiscard, nextRoundStarter
+  };
+  localStorage.setItem('dobon_suspended_game', JSON.stringify(save));
+  alert(I18N[currentLang].savedMsg);
+}
+
+function quitToTitle() {
+  if (confirm(currentLang === 'ja' ? '対局を終了してタイトルへ戻りますか？（履歴は保存され、次回は新規開始となります）' : 'Quit game? (History is archived, next game starts fresh)')) {
+    stopTimer(); clearDobonStandby(); isGameOver = true;
+    localStorage.removeItem('dobon_suspended_game');
+    const rModal = document.getElementById('result-modal');
+    if (rModal) rModal.style.display = 'none';
+    const cModal = document.getElementById('championship-modal');
+    if (cModal) cModal.style.display = 'none';
+    const sModal = document.getElementById('start-modal');
+    if (sModal) sModal.style.display = 'flex';
+  }
+}
+
+// ==========================================
+// 初期化 ＆ ロビー・オンライン通信
+// ==========================================
 window.addEventListener('DOMContentLoaded', () => {
-  initGameUI();
+  try {
+    const savedHistory = localStorage.getItem('dobon_permanent_history');
+    if (savedHistory) setScoreHistory = JSON.parse(savedHistory);
+  } catch (e) {
+    setScoreHistory = [];
+  }
+
+  if (localStorage.getItem('dobon_suspended_game')) {
+    const rBtn = document.getElementById('resume-btn');
+    if (rBtn) rBtn.style.display = 'block';
+  }
+
+  const savedName = localStorage.getItem('dobon_player_name');
+  if (savedName) {
+    const nameEl = document.getElementById('lobby-player-name');
+    if (nameEl) nameEl.value = savedName;
+  }
+
+  // カード外タップで選択解除
+  document.addEventListener('click', (e) => {
+    if (isGameOver || pendingDobonData || activeNakiType !== null || isSpectator) return;
+    if (!e.target.closest('.fan-card') && !e.target.closest('button') && !e.target.closest('.deck-3d-stack')) {
+      if (selectedIndices.length > 0) {
+        selectedIndices = [];
+        updateUI();
+      }
+    }
+  });
+
+  if (typeof io !== 'undefined') {
+    socket = io(SERVER_URL);
+
+    socket.on('connect', () => {
+      const btn = document.getElementById('net-status-btn');
+      if (btn) {
+        btn.innerText = '🟢 ONLINE'; btn.style.borderColor = '#2ecc71'; btn.style.color = '#2ecc71';
+      }
+      setMessage('オンラインサーバー接続完了！');
+    });
+
+    socket.on('disconnect', () => {
+      const btn = document.getElementById('net-status-btn');
+      if (btn) {
+        btn.innerText = '🔴 OFFLINE'; btn.style.borderColor = '#e74c3c'; btn.style.color = '#e74c3c';
+      }
+    });
+
+    socket.on('room_list_updated', (rooms) => {
+      cachedLobbyRooms = rooms || [];
+      filterAndRenderRooms();
+    });
+
+    socket.on('quick_match_found', ({ roomId, isNew }) => {
+      const nameInput = document.getElementById('lobby-player-name');
+      const pName = (nameInput && nameInput.value.trim()) || 'YOU';
+      currentRoomId = roomId;
+      saveRecentRoom(roomId, isNew ? `Room ${roomId}` : `Auto Room ${roomId}`);
+
+      socket.emit('join_or_create_room', {
+        roomId: roomId,
+        roomName: isNew ? `Table ${roomId}` : '',
+        playerName: pName,
+        targetPlayerCount: 4,
+        timeLimit: 25,
+        isPrivate: false,
+        asSpectatorOnly: false
+      });
+    });
+
+    socket.on('room_join_error', ({ message }) => {
+      alert(`[入室エラー] ${message}`);
+    });
+
+    socket.on('entered_as_spectator', ({ roomId, isPlaying }) => {
+      isSpectator = true;
+      const b = document.getElementById('spectator-hud-banner');
+      if (b) b.style.display = 'block';
+      setMessage(I18N[currentLang].spectatorWatching);
+    });
+
+    socket.on('room_detail_updated', (data) => {
+      const rdModal = document.getElementById('room-detail-modal');
+      if (rdModal) rdModal.style.display = 'flex';
+      const olModal = document.getElementById('online-lobby-modal');
+      if (olModal) olModal.style.display = 'none';
+
+      const tEl = document.getElementById('room-detail-title');
+      if (tEl) tEl.innerText = data.roomName;
+      const dEl = document.getElementById('room-detail-desc');
+      if (dEl) dEl.innerText = `部屋ID: ${data.roomId} (${data.players.length} / ${data.targetPlayerCount}人)`;
+
+      let pHtml = '';
+      data.players.forEach((p, idx) => {
+        pHtml += `<div>${idx + 1}. <b>${p.name}</b> ${p.id === socket.id ? '(あなた)' : ''}</div>`;
+      });
+      const pBox = document.getElementById('room-detail-players');
+      if (pBox) pBox.innerHTML = pHtml;
+
+      const specEl = document.getElementById('room-detail-spectators');
+      if (specEl) {
+        if (data.spectators && data.spectators.length > 0) {
+          specEl.innerText = data.spectators.map(s => s.name).join(', ');
+        } else {
+          specEl.innerText = 'なし';
+        }
+      }
+    });
+
+    socket.on('prompt_abort_round', (data) => {
+      const desc = document.getElementById('vote-abort-desc');
+      if (desc) {
+        desc.innerHTML = `プレイヤー「<b>${data.applicantName}</b>」が入室しました。<br>現在の回をノーゲームで流し、即座に合流させますか？<br><span style="font-size:10px; color:#ff7675;">※全員一致で可決（拒否者がいれば続行）</span>`;
+      }
+      const vaModal = document.getElementById('vote-abort-modal');
+      if (vaModal) vaModal.style.display = 'flex';
+    });
+
+    socket.on('abort_round_result', (data) => {
+      const vaModal = document.getElementById('vote-abort-modal');
+      if (vaModal) vaModal.style.display = 'none';
+      if (data.agreed) {
+        setMessage('【流し可決】全員一致によりノーゲームで合流しました！');
+      } else {
+        setMessage('【流し否決】現在のラウンドを継続します。');
+      }
+    });
+
+    socket.on('prompt_expand_table', (data) => {
+      const desc = document.getElementById('vote-expand-desc');
+      if (desc) {
+        desc.innerHTML = `定員を超えるプレイヤーが参加希望しています。<br>卓の定員を <b>${data.newCount}人卓</b> に拡張して許可しますか？<br><span style="font-size:10px; color:#ff7675;">※全会一致で拡張可決</span>`;
+      }
+      const veModal = document.getElementById('vote-expand-modal');
+      if (veModal) veModal.style.display = 'flex';
+    });
+
+    socket.on('table_expanded_confirmed', (data) => {
+      const veModal = document.getElementById('vote-expand-modal');
+      if (veModal) veModal.style.display = 'none';
+      setMessage(`卓定員が ${data.newCapacity}人卓 に拡張されました！`);
+    });
+
+    socket.on('player_turned_cpu', (data) => {
+      if (players[data.seatIndex]) {
+        players[data.seatIndex].isCpu = true;
+        players[data.seatIndex].name = data.newName;
+        updateUI();
+        setMessage(`[通知] ${data.newName} に切り替わりました`);
+      }
+    });
+
+    socket.on('game_started_sync', (syncData) => {
+      const rdModal = document.getElementById('room-detail-modal');
+      if (rdModal) rdModal.style.display = 'none';
+      const olModal = document.getElementById('online-lobby-modal');
+      if (olModal) olModal.style.display = 'none';
+      const stModal = document.getElementById('start-modal');
+      if (stModal) stModal.style.display = 'none';
+      const rsModal = document.getElementById('result-modal');
+      if (rsModal) rsModal.style.display = 'none';
+      const mrBar = document.getElementById('minimized-restore-bar');
+      if (mrBar) mrBar.style.display = 'none';
+
+      isOnlineMatch = true;
+      isGameOver = false;
+      stopTimer();
+      stopConfetti();
+      hideOutcomeBanner();
+
+      isSpectator = !!syncData.isSpectator;
+      const shBanner = document.getElementById('spectator-hud-banner');
+      if (shBanner) shBanner.style.display = isSpectator ? 'block' : 'none';
+
+      currentRound = syncData.roundNum || currentRound;
+      roundMultiplier = syncData.multiplier || 1;
+      userTimeLimit = syncData.timeLimit || 25;
+      drawTwoStack = 0;
+      hideDrawAlertBanner();
+
+      const rNumEl = document.getElementById('round-num');
+      if (rNumEl) rNumEl.innerText = currentRound;
+      const mDisp = document.getElementById('multiplier-display');
+      if (mDisp) mDisp.innerText = roundMultiplier + 'x';
+      const dStack = document.getElementById('draw-stack');
+      if (dStack) dStack.innerText = '0';
+
+      myOnlineSeatIndex = syncData.mySeatIndex;
+      currentOnlineTurnSeat = syncData.turnSeatIndex;
+
+      const reordered = [];
+      const baseIdx = (myOnlineSeatIndex >= 0) ? myOnlineSeatIndex : 0;
+      for (let i = 0; i < syncData.players.length; i++) {
+        const actualIdx = (baseIdx + i) % syncData.players.length;
+        const pData = syncData.players[actualIdx];
+        reordered.push({
+          id: i,
+          seatIndex: pData.seatIndex,
+          name: (i === 0 && !isSpectator) ? 'YOU' : pData.name,
+          hand: (i === 0 && !isSpectator) ? syncData.myHand : new Array(pData.cardCount).fill(null),
+          score: 0,
+          bannedFromWin: false,
+          declaredLast: false,
+          isCpu: pData.isCpu,
+          silhouette: `<svg viewBox="0 0 24 24" width="28" height="28" fill="#555"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`
+        });
+      }
+      players = reordered;
+
+      discardHistory = [syncData.initialCard];
+      lastActionDiscard = { cards: [syncData.initialCard], totalVal: syncData.initialCard.val, playerId: -1 };
+      deck = new Array(syncData.deckCount).fill(null);
+
+      turnIndex = (!isSpectator && currentOnlineTurnSeat === myOnlineSeatIndex) ? 0 : 1;
+      updateUI();
+      playDealSound();
+
+      if (isSpectator) {
+        setMessage(I18N[currentLang].spectatorWatching);
+      } else if (turnIndex === 0) {
+        setMessage('【オンライン対戦】あなたの番です！カードを出してください');
+        startTimerWithDuration(userTimeLimit, handleUserTimeout);
+      } else {
+        const actingPlayer = players.find(p => p.seatIndex === currentOnlineTurnSeat);
+        const name = actingPlayer ? actingPlayer.name : '相手';
+        setMessage(`【オンライン対戦】${name} の手番です。操作を待っています...`);
+      }
+    });
+
+    socket.on('card_played_sync', (data) => {
+      if (!isOnlineMatch) return;
+
+      const visualSeatIndex = getVisualSeatIndex(data.senderSeatIndex);
+      if (players[visualSeatIndex]) {
+        players[visualSeatIndex].hand = new Array(data.remainingCardCount).fill(null);
+      }
+
+      playCardWithHandAnimation(visualSeatIndex, data.card, () => {
+        discardHistory.push(data.card);
+        designatedSuit = data.designatedSuit || null;
+        lastActionDiscard = { cards: [data.card], totalVal: data.card.val, playerId: visualSeatIndex };
+        consecutivePassCount = 0;
+
+        if (data.card.val === 2) {
+          drawTwoStack = data.drawTwoStack || (drawTwoStack + 2);
+          showDrawAlertBanner(`+${drawTwoStack} DRAW`);
+        }
+
+        updateUI();
+      });
+    });
+
+    socket.on('turn_changed_sync', (data) => {
+      if (!isOnlineMatch || isGameOver) return;
+      currentOnlineTurnSeat = data.turnSeatIndex;
+      const isMyTurn = (!isSpectator && currentOnlineTurnSeat === myOnlineSeatIndex);
+      turnIndex = isMyTurn ? 0 : 1;
+      updateUI();
+
+      if (isSpectator) {
+        const actingPlayer = players.find(p => p.seatIndex === currentOnlineTurnSeat);
+        const name = actingPlayer ? actingPlayer.name : 'プレイヤー';
+        setMessage(`【観戦中】${name} の手番です`);
+      } else if (turnIndex === 0) {
+        setMessage(I18N[currentLang].yourTurn);
+        startTimerWithDuration(userTimeLimit, handleUserTimeout);
+      } else {
+        const actingPlayer = players.find(p => p.seatIndex === currentOnlineTurnSeat);
+        const name = actingPlayer ? actingPlayer.name : '相手';
+        setMessage(`${name} の手番です。操作を待っています...`);
+      }
+    });
+
+    socket.on('game_paused_by_naki', (data) => {
+      stopTimer();
+      const banner = document.getElementById('naki-pause-banner');
+      const text = document.getElementById('naki-pause-text');
+      if (banner && text) {
+        text.innerText = `【停止中】${data.actorName} が ${data.nakiType} 宣言・考慮中...`;
+        banner.style.display = 'block';
+      }
+    });
+
+    socket.on('game_resumed_from_naki', () => {
+      const banner = document.getElementById('naki-pause-banner');
+      if (banner) banner.style.display = 'none';
+    });
+
+    socket.on('my_card_drawn', (data) => {
+      data.cards.forEach(card => {
+        players[0].hand.push(card);
+      });
+      const dcEl = document.getElementById('deck-count');
+      if (dcEl) dcEl.innerText = data.deckCount;
+      drawTwoStack = 0;
+      hideDrawAlertBanner();
+      selectedIndices = [];
+      updateUI();
+      consecutivePassCount++;
+      checkNagare();
+    });
+
+    socket.on('card_drawn_sync', (data) => {
+      if (!isOnlineMatch) return;
+      const visualSeat = getVisualSeatIndex(data.senderSeatIndex);
+      playDrawAnimation(visualSeat, () => {
+        if (players[visualSeat]) {
+          for (let i = 0; i < data.drawCount; i++) {
+            players[visualSeat].hand.push(null);
+          }
+        }
+        const dcEl = document.getElementById('deck-count');
+        if (dcEl) dcEl.innerText = data.deckCount;
+        drawTwoStack = 0;
+        hideDrawAlertBanner();
+        updateUI();
+      });
+    });
+
+    socket.on('dobon_result_broadcast', (data) => {
+      isGameOver = true;
+      stopTimer();
+      clearDobonStandby();
+      hideDrawAlertBanner();
+
+      const isMeWinner = (!isSpectator && data.winnerSeatIndex === myOnlineSeatIndex);
+      updateUI();
+      if (!isSpectator) showOutcomeBanner(isMeWinner);
+
+      let detailHtml = `<b>${data.winnerName}</b> の【${data.winType}】！<br><br>`;
+      detailHtml += `勝者: <b>${data.winnerName} (+${data.points}pt)</b><br>`;
+      detailHtml += `放銃者: <b style="color:#e74c3c;">${data.loserName} (-${data.points}pt)</b><br>`;
+      if (data.loserHandCount) {
+        detailHtml += `(${data.loserName} 手札換算: ${data.loserHandCount}枚)<br>`;
+      }
+      detailHtml += `<br>※放銃者以外のプレイヤーは点数変動なし（0pt）`;
+
+      showResultModal(`${data.winnerName} DOBON WIN!`, detailHtml);
+    });
+
+    socket.on('chombo_synced', (data) => {
+      isGameOver = true;
+      stopTimer();
+      clearDobonStandby();
+      drawTwoStack = 0;
+      hideDrawAlertBanner();
+      const ds = document.getElementById('draw-stack');
+      if (ds) ds.innerText = '0';
+
+      roundMultiplier = data.newMultiplier;
+      const md = document.getElementById('multiplier-display');
+      if (md) md.innerText = roundMultiplier + 'x';
+      updateUI();
+
+      showChomboDoubleBanner(data.offenderName, roundMultiplier);
+      showResultModal('CHOMBO / FOUL', `<b>違反者: ${data.offenderName}</b><br>${data.reason}<br><br><span style="color:#ff6b81; font-weight:bold;">※勝者なし・全員に点数支払い ＆ 次回得点倍率は ${roundMultiplier}x に倍々累積！</span>`);
+    });
+
+    socket.on('game_ended_sync', (endData) => {
+      isGameOver = true;
+      stopTimer();
+      clearDobonStandby();
+      drawTwoStack = 0;
+      hideDrawAlertBanner();
+      const ds = document.getElementById('draw-stack');
+      if (ds) ds.innerText = '0';
+
+      const isIWinner = (!isSpectator && endData.winnerSeatIndex === myOnlineSeatIndex);
+      updateUI();
+      if (!isSpectator) showOutcomeBanner(isIWinner);
+
+      let detailHtml = `<b>${endData.winnerName}</b> の【${endData.winningType}】！<br><br>`;
+      detailHtml += isIWinner ? '<span style="color:#2ecc71; font-weight:bold;">あなたの勝利です！</span>' : '<span style="color:#e74c3c;">相手の勝利です。</span>';
+      showResultModal(`${endData.winnerName} WIN!`, detailHtml);
+    });
+  }
 });
 
-function initGameUI() {
-  document.getElementById('version-tag')?.innerText = VERSION;
-  const resumeBtn = document.getElementById('resume-btn');
-  if (resumeBtn && localStorage.getItem('dobon_saved_state')) {
-    resumeBtn.style.display = 'block';
-  }
+function getVisualSeatIndex(absoluteSeatIndex) {
+  const p = players.find(player => player.seatIndex === absoluteSeatIndex);
+  return p ? p.id : 1;
 }
 
+// ==========================================
+// スタート画面 ＆ ロビー操作
+// ==========================================
 function startCpuDirect() {
-  const pSelect = document.getElementById('player-count-select');
-  if (pSelect) configPlayerCount = parseInt(pSelect.value) || 4;
-  
-  const cSelect = document.getElementById('chombo-mode-select');
-  if (cSelect) configChomboMode = cSelect.value;
+  const pSel = document.getElementById('player-count-select');
+  const cSel = document.getElementById('chombo-mode-select');
+  const tSel = document.getElementById('timer-mode-select');
 
-  const tSelect = document.getElementById('timer-mode-select');
-  if (tSelect) maxTurnTime = parseInt(tSelect.value) || 25;
+  numPlayers = pSel ? parseInt(pSel.value) : 4;
+  chomboMode = cSel ? cSel.value : 'strict';
+  userTimeLimit = tSel ? parseInt(tSel.value) : 25;
 
-  document.getElementById('start-modal').style.display = 'none';
-  startNewGame();
-}
+  isOnlineMatch = false;
+  isSpectator = false;
+  const sBanner = document.getElementById('spectator-hud-banner');
+  if (sBanner) sBanner.style.display = 'none';
 
-function startNewGame() {
-  isGameActive = true;
-  deck = createDeck();
-  shuffle(deck);
+  const sModal = document.getElementById('start-modal');
+  if (sModal) sModal.style.display = 'none';
 
   players = [];
-  players.push({ id: 'user', name: 'YOU', isCpu: false, hand: [], score: 0, isLast: false });
-  for (let i = 1; i < configPlayerCount; i++) {
-    players.push({ id: `cpu_${i}`, name: `CPU ${i}`, isCpu: true, hand: [], score: 0, isLast: false });
-  }
+  currentRound = 1;
+  nextRoundStarter = 0;
+  currentSet = getNextSessionNumber();
 
-  // 配牌 (5枚ずつ)
-  for (let r = 0; r < 5; r++) {
-    players.forEach(p => {
-      if (deck.length > 0) p.hand.push(deck.pop());
+  const maleSvg = `<svg viewBox="0 0 24 24" width="28" height="28" fill="#555"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
+  const femaleSvg = `<svg viewBox="0 0 24 24" width="28" height="28" fill="#555"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/><circle cx="12" cy="7" r="1.5" fill="#333"/></svg>`;
+
+  for (let i = 0; i < numPlayers; i++) {
+    players.push({
+      id: i, name: i === 0 ? 'YOU' : `CPU ${i}`,
+      silhouette: Math.random() > 0.5 ? femaleSvg : maleSvg,
+      hand: [], score: 0, bannedFromWin: false, declaredLast: false
     });
   }
-
-  // 最初の捨て札
-  currentDiscard = deck.pop();
-  currentSuit = currentDiscard.suit;
-
-  currentPlayerIndex = 0;
-  playDirection = 1;
-  drawStackCount = 0;
-
-  updateUI();
-  startTurn();
-}
-
-function createDeck() {
-  const suits = ['♠', '♥', '♦', '♣'];
-  const values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
-  let newDeck = [];
-  for (let s of suits) {
-    for (let v of values) {
-      newDeck.push({ suit: s, value: v });
-    }
-  }
-  return newDeck;
-}
-
-function shuffle(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-}
-
-/* =========================================================
-   絵札（K, Q, J）および数字カードの画像・見た目生成ロジック
-   （初期コードの画像参照方式を完全復元）
-   ========================================================= */
-function getCardImageFilename(card) {
-  if (!card) return '';
-  let suitPrefix = '';
-  switch (card.suit) {
-    case '♠': suitPrefix = 's'; break;
-    case '♥': suitPrefix = 'h'; break;
-    case '♦': suitPrefix = 'd'; break;
-    case '♣': suitPrefix = 'c'; break;
-  }
-  let valStr = card.value;
-  if (card.value === 1) valStr = 'a';
-  else if (card.value === 11) valStr = 'j';
-  else if (card.value === 12) valStr = 'q';
-  else if (card.value === 13) valStr = 'k';
-
-  // J, Q, K や各カードの画像ファイル名形式 (例: s_j.png, h_q.png, d_10.png 等)
-  return `${suitPrefix}_${valStr}.png`;
-}
-
-function renderCardElement(card, isSelectable = false, index = -1) {
-  const cardDiv = document.createElement('div');
-  cardDiv.className = 'card-fan-item';
-  if (selectedHandIndices.includes(index)) {
-    cardDiv.classList.add('selected');
-  }
-
-  // J, Q, K やカード画像が存在する場合は img 要素を生成してはめ込む
-  const isPictureCard = (card.value === 11 || card.value === 12 || card.value === 13);
-  const imgFilename = getCardImageFilename(card);
-
-  // カード表面のHTML構造
-  cardDiv.innerHTML = `
-    <div class="card-inner" style="position:relative; width:100%; height:100%; border-radius:6px; overflow:hidden; background:#fff;">
-      <div class="card-corner top-left" style="position:absolute; top:2px; left:4px; font-size:11px; font-weight:bold; color:${(card.suit==='♥'||card.suit==='♦')?'#c0392b':'#111'};">
-        <div>${getCardValueStr(card.value)}</div>
-        <div style="font-size:9px;">${card.suit}</div>
-      </div>
-      
-      <!-- 画像参照領域 -->
-      <div class="card-center-img" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:80%; height:75%; display:flex; justify-content:center; align-items:center;">
-        <img src="${imgFilename}" alt="${card.suit}${card.value}" style="max-width:100%; max-height:100%; object-fit:contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-        <!-- 画像読み込みエラー時のテキストフォールバック -->
-        <div class="fallback-center-symbol" style="display:none; font-size:22px; color:${(card.suit==='♥'||card.suit==='♦')?'#c0392b':'#111'};">
-          ${card.suit}<br><span style="font-size:14px;">${getCardValueStr(card.value)}</span>
-        </div>
-      </div>
-
-      <div class="card-corner bottom-right" style="position:absolute; bottom:2px; right:4px; font-size:11px; font-weight:bold; transform:rotate(180deg); color:${(card.suit==='♥'||card.suit==='♦')?'#c0392b':'#111'};">
-        <div>${getCardValueStr(card.value)}</div>
-        <div style="font-size:9px;">${card.suit}</div>
-      </div>
-    </div>
-  `;
-
-  if (isSelectable && index >= 0) {
-    cardDiv.onclick = () => onHandCardClick(index);
-  }
-
-  return cardDiv;
-}
-
-function getCardValueStr(val) {
-  if (val === 1) return 'A';
-  if (val === 11) return 'J';
-  if (val === 12) return 'Q';
-  if (val === 13) return 'K';
-  return val.toString();
-}
-
-function updateUI() {
-  // 山札・捨て札枚数
-  document.getElementById('deck-count').innerText = deck.length;
-  document.getElementById('discard-sum-val').innerText = currentDiscard ? currentDiscard.value : 0;
-  document.getElementById('giant-suit-symbol').innerText = currentSuit || '♠';
-  document.getElementById('giant-suit-symbol').style.color = (currentSuit === '♥' || currentSuit === '♦') ? '#c0392b' : '#fff';
-
-  // CPU領域描画
-  const cpuContainer = document.getElementById('cpu-arc-container');
-  if (cpuContainer) {
-    cpuContainer.innerHTML = '';
-    for (let i = 1; i < players.length; i++) {
-      const p = players[i];
-      const box = document.createElement('div');
-      box.className = `cpu-player-box ${currentPlayerIndex === i ? 'active-turn' : ''}`;
-      box.innerHTML = `
-        <div style="font-size:10px; color:#fff; font-weight:bold;">${p.name}</div>
-        <div style="font-size:9px; color:var(--gold);">手札: ${p.hand.length}枚</div>
-        <div style="font-size:9px; color:#aaa;">Score: ${p.score}</div>
-      `;
-      cpuContainer.appendChild(box);
-    }
-  }
-
-  // ユーザー手札（扇状描画）
-  const fanContainer = document.getElementById('user-fan');
-  if (fanContainer) {
-    fanContainer.innerHTML = '';
-    const user = players[0];
-    const totalCards = user.hand.length;
-    
-    user.hand.forEach((card, idx) => {
-      const cardEl = renderCardElement(card, true, idx);
-      
-      // 扇状の配置計算
-      const angle = (idx - (totalCards - 1) / 2) * 8; // 回転角度
-      const xOffset = (idx - (totalCards - 1) / 2) * 32; // 横ずらし
-      const yOffset = Math.abs(idx - (totalCards - 1) / 2) * 4; // 弧を描く縦ずらし
-
-      cardEl.style.transform = `translateX(${xOffset}px) translateY(${yOffset}px) rotate(${angle}deg)`;
-      fanContainer.appendChild(cardEl);
-    });
-  }
-
-  // ターンバッジ
-  const turnBadge = document.getElementById('user-turn-badge');
-  if (turnBadge) {
-    turnBadge.style.display = (currentPlayerIndex === 0) ? 'block' : 'none';
-  }
-}
-
-function startTurn() {
-  const p = players[currentPlayerIndex];
-  isMyTurn = (currentPlayerIndex === 0);
-
-  const statusMsg = document.getElementById('status-msg');
-  if (statusMsg) {
-    statusMsg.innerText = isMyTurn ? "あなたの番です！カードをタップして出してください" : `${p.name} の思考中...`;
-  }
-
-  startTimer();
-
-  if (p.isCpu) {
-    setTimeout(() => {
-      cpuPlayTurn(p);
-    }, 1200);
-  }
-}
-
-function startTimer() {
-  clearInterval(turnTimer);
-  remainingTime = maxTurnTime;
-  const timerSec = document.getElementById('timer-sec');
-  if (timerSec) timerSec.innerText = remainingTime;
-
-  turnTimer = setInterval(() => {
-    remainingTime--;
-    if (timerSec) timerSec.innerText = remainingTime;
-    if (remainingTime <= 0) {
-      clearInterval(turnTimer);
-      onTimeOut();
-    }
-  }, 1000);
-}
-
-function onTimeOut() {
-  if (isMyTurn) {
-    onDeckClick(); // タイムアウト時は自動山引き
-  }
-}
-
-function onHandCardClick(index) {
-  if (!isMyTurn) return;
-  const user = players[0];
-  const card = user.hand[index];
-
-  if (isValidPlay(card)) {
-    // カード出し実行
-    user.hand.splice(index, 1);
-    currentDiscard = card;
-    currentSuit = card.suit;
-    selectedHandIndices = [];
-
-    // 8出しのマーク変更判定
-    if (card.value === 8) {
-      document.getElementById('suit-select-floating').style.display = 'block';
-      return;
-    }
-
-    checkWinOrNextTurn();
-  }
-}
-
-function selectSuit(suit) {
-  currentSuit = suit;
-  document.getElementById('suit-select-floating').style.display = 'none';
-  checkWinOrNextTurn();
-}
-
-function onDeckClick() {
-  if (!isMyTurn) return;
-  if (deck.length > 0) {
-    const drawn = deck.pop();
-    players[0].hand.push(drawn);
-  }
-  nextTurn();
-}
-
-function isValidPlay(card) {
-  if (!currentDiscard) return true;
-  return (card.suit === currentSuit || card.value === currentDiscard.value || card.value === 8);
-}
-
-function cpuPlayTurn(cpu) {
-  const validCards = cpu.hand.filter(c => isValidPlay(c));
-  if (validCards.length > 0) {
-    const playCard = validCards[0];
-    const idx = cpu.hand.indexOf(playCard);
-    cpu.hand.splice(idx, 1);
-    currentDiscard = playCard;
-    currentSuit = playCard.suit;
-
-    if (playCard.value === 8) {
-      const suits = ['♠', '♥', '♦', '♣'];
-      currentSuit = suits[Math.floor(Math.random() * suits.length)];
-    }
-  } else {
-    if (deck.length > 0) {
-      cpu.hand.push(deck.pop());
-    }
-  }
-  checkWinOrNextTurn();
-}
-
-function checkWinOrNextTurn() {
-  const currentP = players[currentPlayerIndex];
-  if (currentP.hand.length === 0) {
-    alert(`${currentP.name} の勝利（上がり）です！`);
-    startNewGame();
-    return;
-  }
-  nextTurn();
-}
-
-function nextTurn() {
-  clearInterval(turnTimer);
-  currentPlayerIndex = (currentPlayerIndex + playDirection + players.length) % players.length;
-  updateUI();
-  startTurn();
-}
-
-function triggerUserDobon() {
-  if (!isGameActive) return;
-  alert("DOBON宣言！");
-}
-
-function toggleUserLast() {
-  players[0].isLast = !players[0].isLast;
-  alert(`LAST宣言: ${players[0].isLast ? 'ON' : 'OFF'}`);
+  startRound();
 }
 
 function toggleConfigAccordion() {
   const panel = document.getElementById('cpu-config-panel');
   const arrow = document.getElementById('config-arrow');
-  if (panel) {
-    if (panel.style.display === 'none' || !panel.style.display) {
-      panel.style.display = 'block';
-      if (arrow) arrow.innerText = '▲';
+  if (!panel) return;
+  const isHidden = (panel.style.display === 'none' || panel.style.display === '');
+  panel.style.display = isHidden ? 'block' : 'none';
+  if (arrow) arrow.innerText = isHidden ? '▲' : '▼';
+}
+
+function openLobbyModal() {
+  const m = document.getElementById('online-lobby-modal');
+  if (m) m.style.display = 'flex';
+  renderRecentRooms();
+  fetchRoomList();
+}
+
+function closeLobbyModal() {
+  const m = document.getElementById('online-lobby-modal');
+  if (m) m.style.display = 'none';
+}
+
+function fetchRoomList() {
+  if (socket && socket.connected) {
+    socket.emit('request_room_list');
+  }
+}
+
+function startQuickMatch() {
+  const nameInput = document.getElementById('lobby-player-name');
+  const pName = (nameInput && nameInput.value.trim()) || 'YOU';
+  localStorage.setItem('dobon_player_name', pName);
+
+  if (socket && socket.connected) {
+    socket.emit('quick_match', { playerName: pName });
+  } else {
+    alert('サーバー接続準備中です。緑色ランプになるまでお待ちください。');
+  }
+}
+
+function setLobbyFilter(fType) {
+  currentLobbyFilter = fType;
+  const btnAll = document.getElementById('filter-all-btn');
+  const btnOpen = document.getElementById('filter-open-btn');
+  const btnSpec = document.getElementById('filter-spec-btn');
+
+  if (btnAll) {
+    btnAll.style.background = fType === 'all' ? 'var(--gold)' : 'rgba(45,35,25,0.9)';
+    btnAll.style.color = fType === 'all' ? '#111' : 'var(--gold)';
+  }
+  if (btnOpen) {
+    btnOpen.style.background = fType === 'open' ? 'var(--gold)' : 'rgba(45,35,25,0.9)';
+    btnOpen.style.color = fType === 'open' ? '#111' : 'var(--gold)';
+  }
+  if (btnSpec) {
+    btnSpec.style.background = fType === 'spec' ? 'var(--gold)' : 'rgba(45,35,25,0.9)';
+    btnSpec.style.color = fType === 'spec' ? '#111' : 'var(--gold)';
+  }
+
+  filterAndRenderRooms();
+}
+
+function filterAndRenderRooms() {
+  const sq = document.getElementById('lobby-search-query');
+  const query = (sq && sq.value ? sq.value : '').trim().toLowerCase();
+  let list = [...cachedLobbyRooms];
+
+  if (query) {
+    list = list.filter(r => (r.name && r.name.toLowerCase().includes(query)) || String(r.id).includes(query));
+  }
+
+  if (currentLobbyFilter === 'open') {
+    list = list.filter(r => r.playerCount < r.maxPlayers && !r.isPlaying);
+  } else if (currentLobbyFilter === 'spec') {
+    list = list.filter(r => r.isPlaying || r.spectatorCount > 0);
+  }
+
+  renderLobbyRoomList(list);
+}
+
+function renderLobbyRoomList(rooms) {
+  const container = document.getElementById('lobby-room-container');
+  if (!container) return;
+  if (!rooms || rooms.length === 0) {
+    container.innerHTML = '<div style="font-size:11px; color:#888; text-align:center; padding:15px;">該当する部屋がありません。<br>下のボタンから新しく部屋を作成してください！</div>';
+    return;
+  }
+
+  let html = '';
+  rooms.forEach(r => {
+    const isFull = r.playerCount >= r.maxPlayers;
+    const lockIcon = r.isPrivate ? '🔒 ' : '';
+    let badge = '';
+
+    if (r.isPlaying) {
+      badge = '<span class="badge-playing">対局中 (観戦可)</span>';
+    } else if (isFull) {
+      badge = '<span class="badge-playing">満員 (観戦可)</span>';
     } else {
-      panel.style.display = 'none';
-      if (arrow) arrow.innerText = '▼';
+      badge = '<span class="badge-open">募集中</span>';
+    }
+
+    html += `
+      <div class="lobby-room-item ${isFull && !r.isPlaying ? 'full' : ''}" onclick="onLobbyRoomClicked('${r.id}', ${r.isPrivate})">
+        <div>
+          <b>${lockIcon}${r.name}</b> <span style="font-size:10px; color:#888;">(ID: ${r.id})</span><br>
+          <span style="font-size:10px; color:var(--gold);">${r.playerCount} / ${r.maxPlayers}人 | 持ち時間: ${r.timeLimit}s</span>
+        </div>
+        <div>${badge}</div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+function togglePrivatePasswordInput() {
+  const cb = document.getElementById('create-room-private');
+  const passInput = document.getElementById('create-room-pass');
+  if (passInput && cb) passInput.style.display = cb.checked ? 'block' : 'none';
+}
+
+function onLobbyRoomClicked(roomId, isPrivate) {
+  if (isPrivate) {
+    pendingPasswordRoomId = roomId;
+    const pModal = document.getElementById('password-input-modal');
+    if (pModal) pModal.style.display = 'flex';
+  } else {
+    joinSelectedRoom(roomId, '');
+  }
+}
+
+function submitRoomPassword() {
+  const pwEl = document.getElementById('room-join-password');
+  const pass = pwEl ? pwEl.value : '';
+  const pModal = document.getElementById('password-input-modal');
+  if (pModal) pModal.style.display = 'none';
+
+  if (pendingPasswordRoomId) {
+    joinSelectedRoom(pendingPasswordRoomId, pass);
+    pendingPasswordRoomId = null;
+  }
+}
+
+function closePasswordModal() {
+  const pModal = document.getElementById('password-input-modal');
+  if (pModal) pModal.style.display = 'none';
+  pendingPasswordRoomId = null;
+}
+
+function createOnlineRoom() {
+  const nameInput = document.getElementById('lobby-player-name');
+  const roomNameInput = document.getElementById('create-room-name');
+  const maxSelect = document.getElementById('create-room-max');
+  const timeSelect = document.getElementById('create-room-time');
+  const privCheck = document.getElementById('create-room-private');
+  const passInput = document.getElementById('create-room-pass');
+
+  const pName = (nameInput && nameInput.value.trim()) || 'YOU';
+  const rName = (roomNameInput && roomNameInput.value.trim()) || `Table ${Math.floor(Math.random() * 900 + 100)}`;
+  const maxP = maxSelect ? (parseInt(maxSelect.value) || 4) : 4;
+  const tLimit = timeSelect ? (parseInt(timeSelect.value) || 25) : 25;
+  const isPriv = privCheck ? privCheck.checked : false;
+  const pass = passInput ? passInput.value.trim() : '';
+  const rId = String(Math.floor(Math.random() * 9000 + 1000));
+
+  localStorage.setItem('dobon_player_name', pName);
+  saveRecentRoom(rId, rName);
+
+  currentRoomId = rId;
+  socket.emit('join_or_create_room', {
+    roomId: rId,
+    roomName: rName,
+    playerName: pName,
+    targetPlayerCount: maxP,
+    timeLimit: tLimit,
+    isPrivate: isPriv,
+    password: pass,
+    asSpectatorOnly: false
+  });
+}
+
+function joinSelectedRoom(roomId, password) {
+  const nameInput = document.getElementById('lobby-player-name');
+  const pName = (nameInput && nameInput.value.trim()) || 'YOU';
+  localStorage.setItem('dobon_player_name', pName);
+  saveRecentRoom(roomId, `Room ${roomId}`);
+
+  currentRoomId = roomId;
+  socket.emit('join_or_create_room', {
+    roomId: roomId,
+    playerName: pName,
+    password: password || '',
+    asSpectatorOnly: false
+  });
+}
+
+function saveRecentRoom(roomId, roomName) {
+  try {
+    let list = JSON.parse(localStorage.getItem('dobon_recent_rooms') || '[]');
+    list = list.filter(r => r.id !== roomId);
+    list.unshift({ id: roomId, name: roomName });
+    if (list.length > 4) list.pop();
+    localStorage.setItem('dobon_recent_rooms', JSON.stringify(list));
+  } catch (e) {}
+}
+
+function renderRecentRooms() {
+  const container = document.getElementById('recent-rooms-container');
+  if (!container) return;
+  let list = [];
+  try {
+    list = JSON.parse(localStorage.getItem('dobon_recent_rooms') || '[]');
+  } catch (e) {
+    list = [];
+  }
+  if (list.length === 0) {
+    container.innerHTML = '<span style="font-size:10px; color:#666;">なし</span>';
+    return;
+  }
+  let html = '';
+  list.forEach(r => {
+    html += `<span class="recent-room-chip" onclick="joinSelectedRoom('${r.id}', '')">${r.name} (${r.id})</span>`;
+  });
+  container.innerHTML = html;
+}
+
+function leaveRoomAndBackToLobby() {
+  const m = document.getElementById('room-detail-modal');
+  if (m) m.style.display = 'none';
+  openLobbyModal();
+}
+
+function requestStartOnlineGame() {
+  if (socket && currentRoomId) {
+    socket.emit('start_online_game', { roomId: currentRoomId });
+  }
+}
+
+function requestNextRound() {
+  if (isOnlineMatch && socket && currentRoomId) {
+    socket.emit('request_next_round', { roomId: currentRoomId });
+  } else {
+    nextRound();
+  }
+}
+
+function castAbortVote(agree) {
+  const m = document.getElementById('vote-abort-modal');
+  if (m) m.style.display = 'none';
+  if (socket && currentRoomId) {
+    socket.emit('vote_abort_round', { roomId: currentRoomId, agree });
+  }
+}
+
+function castExpandVote(agree) {
+  const m = document.getElementById('vote-expand-modal');
+  if (m) m.style.display = 'none';
+  if (socket && currentRoomId) {
+    socket.emit('vote_expand_table', { roomId: currentRoomId, agree });
+  }
+}
+
+// ==========================================
+// ゲーム本編進行
+// ==========================================
+function resumeGame() {
+  const raw = localStorage.getItem('dobon_suspended_game');
+  if (!raw) return;
+  let s = null;
+  try { s = JSON.parse(raw); } catch (e) { return; }
+
+  numPlayers = s.numPlayers; chomboMode = s.chomboMode; userTimeLimit = s.userTimeLimit || 25;
+  currentRound = s.currentRound; currentSet = s.currentSet || 1; roundMultiplier = s.roundMultiplier;
+  direction = s.direction; turnIndex = s.turnIndex; drawTwoStack = s.drawTwoStack;
+  designatedSuit = s.designatedSuit; players = s.players; deck = s.deck;
+  discardHistory = s.discardHistory; lastActionDiscard = s.lastActionDiscard;
+  nextRoundStarter = s.nextRoundStarter;
+
+  const sm = document.getElementById('start-modal');
+  if (sm) sm.style.display = 'none';
+  isGameOver = false; updateUI(); setMessage(I18N[currentLang].ready);
+  if (turnIndex === 0) startTimerWithDuration(userTimeLimit, handleUserTimeout);
+  else scheduleCpuTurn();
+}
+
+function startRound() {
+  isGameOver = false; stopTimer(); clearDobonStandby(); stopConfetti();
+  hideOutcomeBanner();
+  createDeck52(); discardHistory = []; drawTwoStack = 0; designatedSuit = null;
+  direction = -1; selectedIndices = []; cancelNakiMode(); pendingLastCheck = false;
+  consecutivePassCount = 0;
+  hideDrawAlertBanner();
+
+  const dobonBtn = document.getElementById('dobon-btn');
+  if (dobonBtn) {
+    dobonBtn.innerText = 'DOBON';
+    dobonBtn.classList.remove('ready', 'gaeshi-mode');
+  }
+
+  const lastBtn = document.getElementById('last-btn');
+  if (lastBtn) lastBtn.classList.remove('active', 'urgent');
+
+  const rModal = document.getElementById('result-modal');
+  if (rModal) rModal.style.display = 'none';
+  const cModal = document.getElementById('championship-modal');
+  if (cModal) cModal.style.display = 'none';
+  const mBar = document.getElementById('minimized-restore-bar');
+  if (mBar) mBar.style.display = 'none';
+  const sFloat = document.getElementById('suit-select-floating');
+  if (sFloat) sFloat.style.display = 'none';
+  const dBanner = document.getElementById('dobon-gaeshi-banner');
+  if (dBanner) dBanner.style.display = 'none';
+  const nBanner = document.getElementById('naki-pause-banner');
+  if (nBanner) nBanner.style.display = 'none';
+
+  const rNum = document.getElementById('round-num');
+  if (rNum) rNum.innerText = currentRound;
+  const mDisp = document.getElementById('multiplier-display');
+  if (mDisp) mDisp.innerText = roundMultiplier + 'x';
+  const dStack = document.getElementById('draw-stack');
+  if (dStack) dStack.innerText = '0';
+  const skBtn = document.getElementById('skip-chombo-btn');
+  if (skBtn) skBtn.style.display = (players[0] && players[0].bannedFromWin) ? 'block' : 'none';
+
+  for (let i = 0; i < 5; i++) setTimeout(playDealSound, i * 60);
+
+  for (let p of players) {
+    p.hand = deck.splice(0, 5);
+    p.declaredLast = false;
+  }
+
+  let initCard = deck.pop();
+  while (initCard.val === 8 || initCard.val === 2) {
+    deck.unshift(initCard);
+    initCard = deck.pop();
+  }
+  discardHistory.push(initCard);
+  lastActionDiscard = { cards: [initCard], totalVal: initCard.val, playerId: -1 };
+
+  turnIndex = (nextRoundStarter !== undefined) ? (nextRoundStarter % numPlayers) : 0;
+  updateUI();
+
+  checkTenho();
+
+  if (turnIndex === 0) {
+    startTimerWithDuration(userTimeLimit, handleUserTimeout);
+  } else {
+    scheduleCpuTurn();
+  }
+}
+
+function skipChomboRound() {
+  if (!players[0] || !players[0].bannedFromWin) return;
+  players[0].score -= 10;
+  players[0].bannedFromWin = false;
+  alert(I18N[currentLang].skipChomboPrompt);
+  nextRound();
+}
+
+function renderRealPips(card) {
+  const suit = card.suit;
+  const positions = {
+    1: [[50, 50, false, true]],
+    2: [[50, 24, false], [50, 76, true]],
+    3: [[50, 24, false], [50, 50, false], [50, 76, true]],
+    4: [[30, 24, false], [70, 24, false], [30, 76, true], [70, 76, true]],
+    5: [[30, 24, false], [70, 24, false], [50, 50, false], [30, 76, true], [70, 76, true]],
+    6: [[30, 24, false], [70, 24, false], [30, 50, false], [70, 50, false], [30, 76, true], [70, 76, true]],
+    7: [[30, 24, false], [70, 24, false], [50, 37, false], [30, 50, false], [70, 50, false], [30, 76, true], [70, 76, true]],
+    8: [[30, 24, false], [70, 24, false], [50, 36, false], [30, 50, false], [70, 50, false], [50, 64, true], [30, 76, true], [70, 76, true]],
+    9: [[30, 22, false], [70, 22, false], [30, 40, false], [70, 40, false], [50, 50, false], [30, 60, true], [70, 60, true], [30, 78, true], [70, 78, true]],
+    10: [[30, 22, false], [70, 22, false], [50, 32, false], [30, 40, false], [70, 40, false], [30, 60, true], [70, 60, true], [50, 68, true], [30, 78, true], [70, 78, true]]
+  };
+
+  const list = positions[card.val] || [];
+  let html = '<div class="pips-container-real">';
+  list.forEach(p => {
+    if (p[3]) {
+      html += `<div class="pip-center-huge">${suit}</div>`;
+    } else {
+      html += `<div class="pip-real ${p[2] ? 'flip' : ''}" style="left:${p[0]}%; top:${p[1]}%;">${suit}</div>`;
+    }
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderCardContent(card) {
+  const key = `${card.suit}_${card.label}`;
+  if (PHOTO_CARDS[key]) {
+    return `<img class="card-face-photo" src="${PHOTO_CARDS[key]}" alt="${key}">`;
+  }
+  return renderRealPips(card);
+}
+
+function renderCardHtml(card, extraClass = '') {
+  if (!card) return '';
+  return `
+    <div class="card ${card.color} ${extraClass}">
+      <div class="idx-top">${card.label}<br>${card.suit}</div>
+      ${renderCardContent(card)}
+      <div class="idx-bottom">${card.label}<br>${card.suit}</div>
+    </div>
+  `;
+}
+
+function updateUI() {
+  const dirEl = document.getElementById('dir-display');
+  if (dirEl) dirEl.innerText = direction === -1 ? I18N[currentLang].dirCCW : I18N[currentLang].dirCW;
+  
+  const giantBox = document.getElementById('giant-suit-indicator');
+  const giantSym = document.getElementById('giant-suit-symbol');
+  if (giantBox && giantSym) {
+    if (designatedSuit) {
+      giantSym.innerText = designatedSuit;
+      giantSym.style.color = (designatedSuit === '♥' || designatedSuit === '♦') ? 'var(--card-red)' : '#fff';
+      giantBox.style.display = 'flex';
+    } else {
+      giantBox.style.display = 'none';
+    }
+  }
+
+  const drawStackEl = document.getElementById('draw-stack');
+  if (drawStackEl) drawStackEl.innerText = `${drawTwoStack}`;
+  const deckCountEl = document.getElementById('deck-count');
+  if (deckCountEl) deckCountEl.innerText = deck.length;
+
+  const stackBox = document.getElementById('discard-stack-box');
+  if (stackBox) {
+    stackBox.innerHTML = '';
+    const visible = discardHistory.slice(-Math.min(discardHistory.length, 4));
+    visible.forEach((c, idx) => {
+      const el = document.createElement('div');
+      el.className = 'discard-card-item';
+      el.style.left = `${idx * 28}px`;
+      el.style.zIndex = 5 + idx;
+      el.innerHTML = renderCardHtml(c);
+      stackBox.appendChild(el);
+    });
+  }
+
+  const discardSumEl = document.getElementById('discard-sum-val');
+  if (discardSumEl) discardSumEl.innerText = lastActionDiscard ? lastActionDiscard.totalVal : 0;
+
+  // 相手座席
+  const arcContainer = document.getElementById('cpu-arc-container');
+  if (arcContainer) {
+    arcContainer.innerHTML = '';
+    const cpuCount = players.length - 1;
+
+    for (let i = 1; i < players.length; i++) {
+      const p = players[i];
+      const isAttacker = pendingDobonData && pendingDobonData.winner.id === p.id;
+      
+      let isActiveTurn = false;
+      if (isOnlineMatch) {
+        isActiveTurn = (p.seatIndex === currentOnlineTurnSeat);
+      } else {
+        isActiveTurn = (turnIndex === i);
+      }
+
+      const seat = document.createElement('div');
+      seat.className = `cpu-seat ${isActiveTurn ? 'active' : ''} ${isAttacker ? 'dobon-attacker' : ''}`;
+      const arcPos = (i - 1) - (cpuCount - 1) / 2;
+      seat.style.transform = `translateY(${Math.abs(arcPos) * 10}px)`;
+
+      let fanHtml = '<div class="cpu-fan-cards">';
+      if (isGameOver || isAttacker) {
+        p.hand.forEach((c, cIdx) => {
+          if (c) {
+            fanHtml += `<div style="position:absolute; left:${cIdx * 18}px; transform:scale(0.42); transform-origin:top left;">${renderCardHtml(c)}</div>`;
+          } else {
+            fanHtml += `<div class="cpu-fan-card" style="position:absolute; left:${cIdx * 12}px;"></div>`;
+          }
+        });
+      } else {
+        const showCount = Math.min(p.hand.length, 7);
+        for (let c = 0; c < showCount; c++) {
+          const rot = (c - (showCount - 1) / 2) * 12;
+          const xOff = (c - (showCount - 1) / 2) * 6;
+          fanHtml += `<div class="cpu-fan-card" style="transform: translate(${xOff}px, 0) rotate(${rot}deg);"></div>`;
+        }
+      }
+      fanHtml += `<img class="cpu-hand-img" src="opponent.png" alt="Hand"></div>`;
+
+      seat.innerHTML = `
+        <div class="cpu-billboard-stand">
+          <div class="turn-indicator-badge">▼ TURN ▼</div>
+          <div class="cpu-silhouette">${p.silhouette}</div>
+          ${fanHtml}
+          <div class="cpu-info">
+            <b>${p.name}</b> (${p.hand.length})<br>
+            <span style="color:var(--gold);">${p.score}pt</span>
+            ${p.declaredLast ? ' ★LAST' : ''}
+          </div>
+        </div>
+      `;
+      arcContainer.appendChild(seat);
+    }
+  }
+
+  // 自分の手番時ゴールドネオン
+  const userFanArea = document.getElementById('user-fan-area');
+  const isUserTurn = isOnlineMatch ? (!isSpectator && currentOnlineTurnSeat === myOnlineSeatIndex) : (turnIndex === 0);
+  if (userFanArea) {
+    if (isUserTurn && !isGameOver) {
+      userFanArea.classList.add('your-turn-active');
+    } else {
+      userFanArea.classList.remove('your-turn-active');
+    }
+  }
+
+  // ドボンボタン
+  const user = players[0];
+  const mySum = (user && !isSpectator) ? user.hand.reduce((s, c) => s + (c ? c.val : 0), 0) : 0;
+  const targetVal = lastActionDiscard ? lastActionDiscard.totalVal : null;
+  const dobonBtn = document.getElementById('dobon-btn');
+
+  if (dobonBtn) {
+    if (isSpectator) {
+      dobonBtn.style.display = 'none';
+    } else {
+      dobonBtn.style.display = 'block';
+      if (pendingDobonData && pendingDobonData.loser.id === 0) {
+        dobonBtn.innerText = 'DOBON-GAESHI';
+        if (mySum === pendingDobonData.actionDiscard.totalVal && user.hand.length >= 2) {
+          dobonBtn.classList.add('gaeshi-mode');
+        } else {
+          dobonBtn.classList.remove('gaeshi-mode');
+        }
+      } else {
+        dobonBtn.innerText = 'DOBON';
+        dobonBtn.classList.remove('gaeshi-mode');
+        if (!isGameOver && targetVal !== null && mySum === targetVal && user && user.hand.length >= 2 && !user.bannedFromWin) {
+          dobonBtn.classList.add('ready');
+        } else {
+          dobonBtn.classList.remove('ready');
+        }
+      }
+    }
+  }
+
+  const lastBtn = document.getElementById('last-btn');
+  if (lastBtn) {
+    if (isSpectator) {
+      lastBtn.style.display = 'none';
+    } else {
+      lastBtn.style.display = 'block';
+      if (pendingLastCheck && user && !user.declaredLast) {
+        lastBtn.classList.add('urgent');
+      } else {
+        lastBtn.classList.remove('urgent');
+      }
+    }
+  }
+
+  const userSumEl = document.getElementById('user-sum');
+  if (userSumEl) userSumEl.innerText = mySum;
+
+  // 手札展開
+  const userFanBox = document.getElementById('user-fan');
+  if (userFanBox) {
+    userFanBox.innerHTML = '';
+    if (!isSpectator && user) {
+      const total = user.hand.length;
+      const isTwoRows = total > 8;
+
+      user.hand.forEach((card, idx) => {
+        if (!card) return;
+        const isSelected = selectedIndices.includes(idx);
+        let rowClass = '';
+        let indexInRow = idx;
+        let countInRow = total;
+
+        if (isTwoRows) {
+          const isBack = idx % 2 === 0;
+          rowClass = isBack ? 'row-back' : 'row-front';
+          indexInRow = Math.floor(idx / 2);
+          countInRow = Math.ceil(total / 2);
+        }
+
+        const angleStep = Math.min(26 / Math.max(countInRow - 1, 1), 5.5);
+        const xStep = Math.min(260 / Math.max(countInRow, 1), 36);
+        const angle = (indexInRow - (countInRow - 1) / 2) * angleStep;
+        const xOffset = (indexInRow - (countInRow - 1) / 2) * xStep;
+        const yOffset = Math.abs(angle) * 0.6;
+
+        const cardEl = document.createElement('div');
+        cardEl.className = `fan-card ${rowClass} ${isSelected ? 'selected' : ''}`;
+        const lift = isSelected ? -28 : 0;
+        cardEl.style.transform = `translate(${xOffset}px, ${yOffset + lift}px) rotate(${angle}deg)`;
+        cardEl.style.zIndex = isSelected ? 90 : (rowClass === 'row-back' ? 30 + idx : 45 + idx);
+        cardEl.innerHTML = renderCardHtml(card);
+        cardEl.onclick = (e) => {
+          e.stopPropagation();
+          onCardClick(idx);
+        };
+        userFanBox.appendChild(cardEl);
+      });
     }
   }
 }
 
-function openPayoutModal() { document.getElementById('payout-modal').style.display = 'flex'; }
-function closePayoutModal() { document.getElementById('payout-modal').style.display = 'none'; }
-function openScoreHistoryModal() { document.getElementById('history-modal').style.display = 'flex'; }
-function closeScoreHistoryModal() { document.getElementById('history-modal').style.display = 'none'; }
-function suspendGame() { alert("ゲームを中断しました"); }
-function quitToTitle() { location.reload(); }
+function setMessage(msg) {
+  const el = document.getElementById('status-msg');
+  if (el) el.innerText = msg;
+}
+
+function playCardWithHandAnimation(playerId, card, callback) {
+  const unit = document.getElementById('flying-play-unit');
+  const cardSlot = document.getElementById('flying-card-slot');
+  const handImg = document.getElementById('flying-hand-img');
+  if (!unit || !cardSlot || !handImg) { if (callback) callback(); return; }
+
+  cardSlot.innerHTML = renderCardHtml(card);
+  unit.style.display = 'block'; unit.style.opacity = '1';
+
+  let sX = window.innerWidth / 2, sY = window.innerHeight * 0.82;
+  let eX = window.innerWidth / 2, eY = window.innerHeight * 0.45;
+
+  if (playerId === 0) {
+    handImg.style.transform = 'scaleX(-1) rotate(-15deg)';
+    unit.style.transform = `translate(${sX - 85}px, ${sY - 85}px) scale(1)`;
+    setTimeout(() => { unit.style.transform = `translate(${eX - 85}px, ${eY - 85}px) scale(0.9)`; }, 20);
+  } else {
+    handImg.style.transform = 'rotate(180deg)';
+    const seats = document.querySelectorAll('.cpu-seat');
+    const tSeat = seats[playerId - 1];
+    if (tSeat) {
+      const r = tSeat.getBoundingClientRect();
+      sX = r.left + r.width / 2; sY = r.top + r.height / 2;
+    }
+    unit.style.transform = `translate(${sX - 85}px, ${sY - 85}px) scale(0.7)`;
+    setTimeout(() => { unit.style.transform = `translate(${eX - 85}px, ${eY - 85}px) scale(0.9)`; }, 20);
+  }
+
+  setTimeout(() => {
+    playCardSnapSound();
+    unit.style.opacity = '0';
+    setTimeout(() => { unit.style.display = 'none'; if (callback) callback(); }, 120);
+  }, 360);
+}
+
+function playDrawAnimation(playerId, callback) {
+  const c = document.getElementById('flying-draw-card');
+  if (!c) { if (callback) callback(); return; }
+  c.style.display = 'block';
+  const dX = window.innerWidth / 2 - 50, dY = window.innerHeight * 0.45;
+  let tX = window.innerWidth / 2, tY = window.innerHeight * 0.82;
+
+  if (playerId !== 0) {
+    const seats = document.querySelectorAll('.cpu-seat');
+    const tSeat = seats[playerId - 1];
+    if (tSeat) {
+      const r = tSeat.getBoundingClientRect();
+      tX = r.left + r.width / 2; tY = r.top + r.height / 2;
+    }
+  }
+
+  c.style.transform = `translate(${dX}px, ${dY}px) scale(0.9)`;
+  setTimeout(() => {
+    playDealSound();
+    c.style.transform = `translate(${tX - 44}px, ${tY - 64}px) scale(0.4)`;
+  }, 20);
+
+  setTimeout(() => { c.style.display = 'none'; if (callback) callback(); }, 360);
+}
+
+function stopTimer() {
+  if (turnTimer) { clearInterval(turnTimer); turnTimer = null; }
+  const b = document.getElementById('timer-badge');
+  if (b) b.classList.remove('urgent');
+  const s = document.getElementById('timer-sec');
+  if (s) s.innerText = '--';
+}
+
+function startTimerWithDuration(sec, onTimeout) {
+  stopTimer();
+  remainingTime = Math.min(sec || 25, 60);
+  updateTimerDisplay();
+  turnTimer = setInterval(() => {
+    remainingTime--; updateTimerDisplay();
+    if (remainingTime <= 0) {
+      stopTimer();
+      if (onTimeout) onTimeout();
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const s = document.getElementById('timer-sec');
+  if (s) s.innerText = `${remainingTime}s`;
+  const t = (userTimeLimit <= 10) ? 3 : 5;
+  const b = document.getElementById('timer-badge');
+  if (b) {
+    if (remainingTime <= t) b.classList.add('urgent');
+    else b.classList.remove('urgent');
+  }
+}
+
+function handleUserTimeout() {
+  commitChombo(players[0], I18N[currentLang].timeoutMsg);
+}
+
+function onCardClick(index) {
+  if (isGameOver || pendingDobonData || isSpectator) return;
+  if (activeNakiType !== null) {
+    const pos = selectedIndices.indexOf(index);
+    if (pos > -1) selectedIndices.splice(pos, 1);
+    else selectedIndices.push(index);
+    updateUI(); return;
+  }
+  if (turnIndex !== 0) return;
+
+  if (selectedIndices.includes(index)) playUserCard(index);
+  else { selectedIndices = [index]; updateUI(); }
+}
+
+function playUserCard(index) {
+  const card = players[0].hand[index];
+  const top = discardHistory[discardHistory.length - 1];
+
+  if (players[0].declaredLast && players[0].hand.length >= 3) {
+    commitChombo(players[0], I18N[currentLang].chomboWrongLast);
+    return;
+  }
+
+  if (players[0].hand.length === 2 && !players[0].declaredLast && !pendingLastCheck) {
+    if (userLastWarningCount === 0) {
+      userLastWarningCount++;
+      alert('【警告】ラスト宣言を忘れています！先にLASTを押してから出してください（1回目は免除）');
+      selectedIndices = [];
+      updateUI();
+      return;
+    } else {
+      commitChombo(players[0], I18N[currentLang].chomboMissLast);
+      return;
+    }
+  }
+
+  if (players[0].hand.length === 1 && !players[0].declaredLast) {
+    commitChombo(players[0], I18N[currentLang].chomboMissLast);
+    return;
+  }
+
+  if (drawTwoStack > 0 && card.val !== 2) {
+    if (chomboMode === 'strict') commitChombo(players[0], 'Stacked Draw Two violation');
+    else setMessage('Must play 2 or draw from deck');
+    return;
+  }
+
+  const isSuitMatch = designatedSuit ? (card.suit === designatedSuit) : (card.suit === top.suit);
+  const isNumMatch = card.label === top.label;
+  const isAllMighty8 = (card.val === 8);
+
+  if (isSuitMatch || isNumMatch || isAllMighty8) {
+    if (players[0].hand.length === 1 && isAllMighty8 && !isSuitMatch && !isNumMatch) {
+      commitChombo(players[0], 'Cannot finish with 8 as All-mighty'); return;
+    }
+
+    stopTimer();
+    consecutivePassCount = 0;
+
+    if (players[0].hand.length === 2) {
+      if (players[0].declaredLast) {
+        speakVoice(currentLang === 'ja' ? 'ラスト！' : 'Last!');
+      } else {
+        pendingLastCheck = true;
+      }
+    }
+
+    playCardWithHandAnimation(0, card, () => {
+      players[0].hand.splice(index, 1);
+      discardHistory.push(card);
+      selectedIndices = [];
+      designatedSuit = null;
+      lastActionDiscard = { cards: [card], totalVal: card.val, playerId: 0 };
+
+      if (card.val === 8) {
+        const sf = document.getElementById('suit-select-floating');
+        if (sf) sf.style.display = 'block';
+        return;
+      }
+
+      if (isOnlineMatch && socket && currentRoomId) {
+        socket.emit('play_card', {
+          roomId: currentRoomId,
+          card: card,
+          designatedSuit: null,
+          remainingCardCount: players[0].hand.length
+        });
+      }
+
+      postCardPlayEffect(card, players[0]);
+    });
+  } else {
+    if (chomboMode === 'strict') commitChombo(players[0], `Cannot play (${card.suit}${card.label})`);
+    else setMessage('Cannot play this card');
+  }
+}
+
+function selectSuit(suit) {
+  designatedSuit = suit;
+  const sf = document.getElementById('suit-select-floating');
+  if (sf) sf.style.display = 'none';
+  setMessage(I18N[currentLang].suitChanged.replace('{suit}', suit));
+
+  if (isOnlineMatch && socket && currentRoomId) {
+    socket.emit('play_card', {
+      roomId: currentRoomId,
+      card: { val: 8, label: '8', suit: suit, color: (suit === '♥' || suit === '♦') ? 'red' : 'black' },
+      designatedSuit: suit,
+      remainingCardCount: players[0].hand.length
+    });
+  }
+
+  postCardPlayEffect({ val: 8, label: '8', suit }, players[0]);
+}
+
+function postCardPlayEffect(card, player) {
+  updateUI();
+
+  if (player.hand.length === 0) {
+    if (player.bannedFromWin) {
+      commitChombo(player, 'Attempted to win while win-banned'); return;
+    }
+    endRoundNormalWin(player); return;
+  }
+
+  let skipCount = 0;
+  if (card.val === 2) {
+    drawTwoStack += 2;
+    showDrawAlertBanner(`+${drawTwoStack} DRAW`);
+  } else if (card.val === 9) {
+    direction *= -1; setMessage('Reverse (9)');
+  } else if (card.val === 1) {
+    skipCount = 1;
+  }
+
+  if (isOnlineMatch) return;
+
+  if (card.val === 1) setMessage('Skip (A)');
+  if (checkCpuInterrupts(card.val, player.id)) return;
+  passTurn(skipCount);
+}
+
+function showDrawAlertBanner(text) {
+  const b = document.getElementById('draw-alert-banner');
+  if (b) {
+    b.innerText = text;
+    b.style.display = 'block';
+  }
+}
+function hideDrawAlertBanner() {
+  const b = document.getElementById('draw-alert-banner');
+  if (b) b.style.display = 'none';
+}
+
+function passTurn(skips = 0) {
+  stopTimer();
+  turnIndex = (turnIndex + (1 + skips) * direction) % numPlayers;
+  while (turnIndex < 0) turnIndex += numPlayers;
+  updateUI();
+
+  if (turnIndex === 0) {
+    setMessage(I18N[currentLang].yourTurn);
+    startTimerWithDuration(userTimeLimit, handleUserTimeout);
+  } else {
+    if (isOnlineMatch) {
+      setMessage(`${players[turnIndex].name} ${I18N[currentLang].opponentThinking}`);
+    } else {
+      setMessage(`${players[turnIndex].name} ${I18N[currentLang].cpuThinking}`);
+      const delay = pendingLastCheck ? 5200 : Math.floor(Math.random() * (4000 - 1500 + 1)) + 1500;
+      setTimeout(cpuTurn, delay);
+    }
+  }
+}
+
+function scheduleCpuTurn() {
+  if (isOnlineMatch) return;
+  const delay = Math.floor(Math.random() * (4000 - 1500 + 1)) + 1500;
+  setTimeout(cpuTurn, delay);
+}
+
+function onDeckClick() {
+  if (turnIndex !== 0 || isGameOver || pendingDobonData || isSpectator) return;
+  stopTimer();
+
+  if (players[0].declaredLast) {
+    players[0].declaredLast = false;
+    const lBtn = document.getElementById('last-btn');
+    if (lBtn) lBtn.classList.remove('active', 'urgent');
+    setMessage(I18N[currentLang].lastCanceled);
+  }
+  pendingLastCheck = false;
+
+  playDrawAnimation(0, () => {
+    if (isOnlineMatch && socket && currentRoomId) {
+      socket.emit('draw_card', { roomId: currentRoomId, count: drawTwoStack > 0 ? drawTwoStack : 1 });
+      return;
+    }
+
+    if (drawTwoStack > 0) {
+      for (let i = 0; i < drawTwoStack; i++) drawCard(players[0]);
+      setMessage(I18N[currentLang].drewCards.replace('{count}', drawTwoStack));
+      drawTwoStack = 0;
+      hideDrawAlertBanner();
+    } else {
+      drawCard(players[0]);
+      setMessage(I18N[currentLang].drewOne);
+    }
+    selectedIndices = []; updateUI();
+    consecutivePassCount++;
+    checkNagare();
+    passTurn(0);
+  });
+}
+
+function drawCard(player) {
+  if (deck.length === 0) {
+    const top = discardHistory.pop();
+    deck = discardHistory.slice();
+    discardHistory = [top];
+    for (let i = deck.length - 1; i > 0; i--) {
+      const r = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[r]] = [deck[r], deck[i]];
+    }
+  }
+  if (deck.length > 0) player.hand.push(deck.pop());
+}
+
+function checkNagare() {
+  if (consecutivePassCount >= numPlayers * 2) {
+    isGameOver = true; stopTimer(); clearDobonStandby();
+    roundMultiplier *= 2;
+    showResultModal('NAGARE (流局)', `全員が出せないまま一周流局しました。<br>次ゲームの得点倍率は <b>${roundMultiplier}x</b> に累積されます！`);
+  }
+}
+
+function toggleUserLast() {
+  players[0].declaredLast = !players[0].declaredLast;
+  const btn = document.getElementById('last-btn');
+  if (btn) {
+    btn.classList.toggle('active', players[0].declaredLast);
+    btn.classList.remove('urgent');
+  }
+
+  if (players[0].declaredLast) {
+    if (pendingLastCheck) {
+      pendingLastCheck = false;
+      speakVoice(currentLang === 'ja' ? 'ラスト！' : 'Last!');
+      setMessage('「LAST」宣言が成立しました！');
+    } else {
+      setMessage(I18N[currentLang].lastStandby);
+    }
+  } else {
+    setMessage(I18N[currentLang].lastReset);
+  }
+}
+
+function startNakiMode(type) {
+  if (isGameOver || pendingDobonData || isSpectator) return;
+  activeNakiType = type; selectedIndices = [];
+  const pBtn = document.getElementById('pon-btn');
+  const kBtn = document.getElementById('kan-btn');
+  const cBtn = document.getElementById('confirm-naki-btn');
+  if (pBtn) pBtn.classList.toggle('active', type === 2);
+  if (kBtn) kBtn.classList.toggle('active', type === 3);
+  if (cBtn) cBtn.style.display = 'block';
+
+  triggerFlash();
+
+  if (isOnlineMatch && socket && currentRoomId) {
+    socket.emit('pause_for_naki', { roomId: currentRoomId, nakiType: type === 2 ? 'PON' : 'KAN' });
+  }
+
+  startTimerWithDuration(userTimeLimit, () => {
+    if (turnIndex !== 0) commitChombo(players[0], `${activeNakiType === 2 ? 'Pon' : 'Kan'} ${I18N[currentLang].timeoutMsg}`);
+    else cancelNakiMode();
+  });
+
+  if (turnIndex !== 0) {
+    speakVoice(type === 2 ? (currentLang === 'ja' ? 'ポン！' : 'Pon!') : (currentLang === 'ja' ? 'カン！' : 'Kan!'));
+  }
+  setMessage(I18N[currentLang].ponKanSelect);
+}
+
+function cancelNakiMode() {
+  activeNakiType = null; selectedIndices = [];
+  const pBtn = document.getElementById('pon-btn');
+  const kBtn = document.getElementById('kan-btn');
+  const cBtn = document.getElementById('confirm-naki-btn');
+  if (pBtn) pBtn.classList.remove('active');
+  if (kBtn) kBtn.classList.remove('active');
+  if (cBtn) cBtn.style.display = 'none';
+
+  if (isOnlineMatch && socket && currentRoomId) {
+    socket.emit('resume_from_naki', { roomId: currentRoomId });
+  }
+
+  if (turnIndex === 0) startTimerWithDuration(userTimeLimit, handleUserTimeout);
+  else stopTimer();
+}
+
+function confirmNaki() {
+  if (!activeNakiType) return;
+  const req = activeNakiType;
+
+  if (selectedIndices.length !== req) {
+    if (turnIndex !== 0) commitChombo(players[0], `${req === 2 ? 'Pon' : 'Kan'} ${I18N[currentLang].nakiFailed}`);
+    else alert(`Select exactly ${req} cards.`);
+    cancelNakiMode(); return;
+  }
+
+  const cards = selectedIndices.map(i => players[0].hand[i]);
+  const val = cards[0].val;
+
+  if (!cards.every(c => c.val === val)) {
+    if (turnIndex !== 0) commitChombo(players[0], 'Mismatched cards for Pon/Kan (Chombo)');
+    else alert('All cards must match.');
+    cancelNakiMode(); return;
+  }
+  if (val === 8) {
+    commitChombo(players[0], 'No Pon/Kan for 8s (Chombo)');
+    cancelNakiMode(); return;
+  }
+  const top = discardHistory[discardHistory.length - 1];
+  if (top.val !== val) {
+    if (turnIndex !== 0 || chomboMode === 'strict') commitChombo(players[0], 'Card does not match pile (Chombo)');
+    else alert('Must match discard pile value.');
+    cancelNakiMode(); return;
+  }
+
+  selectedIndices.sort((a, b) => b - a).forEach(idx => players[0].hand.splice(idx, 1));
+  cards.forEach(c => discardHistory.push(c));
+
+  const isKan = (req === 3);
+  const isPon = !isKan;
+  lastActionDiscard = {
+    cards, totalVal: cards.length * val, playerId: 0,
+    isPon: isPon, isKan: isKan, baseVal: val
+  };
+
+  if (isOnlineMatch && socket && currentRoomId) {
+    socket.emit('resume_from_naki', { roomId: currentRoomId });
+  }
+
+  if (players[0].hand.length === 0) {
+    cancelNakiMode();
+    executePonDobonWin(players[0], top, isKan, val);
+    return;
+  }
+
+  if (turnIndex === 0) speakVoice(req === 2 ? (currentLang === 'ja' ? 'ポン！' : 'Pon!') : (currentLang === 'ja' ? 'カン！' : 'Kan!'));
+
+  cancelNakiMode();
+  handlePonKanEffects(cards, players[0]);
+}
+
+function executePonDobonWin(winner, discardCard, isKan, baseVal) {
+  isGameOver = true; stopTimer(); clearDobonStandby(); hideDrawAlertBanner();
+
+  const loserId = lastActionDiscard && lastActionDiscard.playerId !== -1 ? lastActionDiscard.playerId : (winner.id - direction + numPlayers) % numPlayers;
+  const loser = players[loserId];
+
+  loser.hand.push(discardCard);
+
+  let points = 0, title = '';
+  const loserCount = calculateSpecialHandCount(loser.hand);
+
+  if (isKan && baseVal === 2) {
+    points = 160 * roundMultiplier; title = '"2" KAN-DOBON WIN! (固定160点)';
+    speakVoice(currentLang === 'ja' ? 'カンドボン！' : 'Kan Dobon!');
+  } else if (isKan) {
+    points = 8 * loserCount * roundMultiplier; title = 'KAN-DOBON WIN! (8pt/枚)';
+    speakVoice(currentLang === 'ja' ? 'カンドボン！' : 'Kan Dobon!');
+  } else if (isPon && baseVal === 2) {
+    points = 80 * roundMultiplier; title = '"2" PON-DOBON WIN! (固定80点)';
+    speakVoice(currentLang === 'ja' ? 'ポンドボン！' : 'Pon Dobon!');
+  } else {
+    points = 4 * loserCount * roundMultiplier; title = 'PON-DOBON WIN! (4pt/枚)';
+    speakVoice(currentLang === 'ja' ? 'ポンドボン！' : 'Pon Dobon!');
+  }
+
+  const deltas = players.map(p => (p.id === winner.id ? points : (p.id === loser.id ? -points : 0)));
+  winner.score += points; loser.score -= points;
+
+  recordRoundHistory(isKan ? 'KAN-DOBON' : 'PON-DOBON', deltas);
+  roundMultiplier = 1; nextRoundStarter = winner.id;
+  updateUI();
+
+  if (isOnlineMatch && socket && currentRoomId) {
+    socket.emit('dobon_declared_sync', {
+      roomId: currentRoomId,
+      winnerSeatIndex: winner.seatIndex !== undefined ? winner.seatIndex : winner.id,
+      loserSeatIndex: loser.seatIndex !== undefined ? loser.seatIndex : loser.id,
+      winType: isKan ? 'KAN-DOBON' : 'PON-DOBON',
+      points: points,
+      loserHandCount: loserCount
+    });
+  }
+
+  showOutcomeBanner(winner.id === 0);
+  showResultModal(title, `<b>${winner.name}</b> の【${isKan ? 'KAN-DOBON' : 'PON-DOBON'}】！<br><br>勝者: <b>${winner.name} (+${points}pt)</b><br>放銃者: <b style="color:#e74c3c;">${loser.name} (-${points}pt)</b><br>(${loser.name} 手札換算: ${loserCount}枚)<br><br>※他プレイヤーは点数変動なし`);
+}
+
+function handlePonKanEffects(cards, player) {
+  const val = cards[0].val, isKan = (cards.length === 3);
+  if (val === 2) {
+    drawTwoStack += (isKan ? 6 : 4);
+    showDrawAlertBanner(`+${drawTwoStack} DRAW`);
+  }
+  let skips = 0;
+  if (val === 1) skips = isKan ? 3 : 2;
+  if (val === 9 && isKan) direction *= -1;
+
+  turnIndex = player.id; updateUI();
+  if (!isOnlineMatch) {
+    if (checkCpuInterrupts(lastActionDiscard.totalVal, player.id)) return;
+  }
+  passTurn(skips);
+}
+
+function triggerUserDobon() {
+  if (isGameOver || isSpectator) return;
+  const user = players[0];
+
+  if (user.hand.length === 1) {
+    commitChombo(user, I18N[currentLang].chomboSingleCardDobon);
+    return;
+  }
+
+  if (pendingDobonData && pendingDobonData.loser.id === 0) {
+    const targetVal = pendingDobonData.actionDiscard.totalVal;
+    const mySum = user.hand.reduce((s, c) => s + (c ? c.val : 0), 0);
+
+    if (mySum === targetVal) {
+      speakVoice(currentLang === 'ja' ? 'ドボン返し！' : 'Counter Dobon!');
+      clearDobonStandby();
+      executeDobonGaeshiWin(user, pendingDobonData.winner);
+      return;
+    } else {
+      commitChombo(user, `手札合計(${mySum})が一致していません（誤ドボン返し）`);
+      return;
+    }
+  }
+
+  speakVoice(currentLang === 'ja' ? 'ドボン！' : 'Dobon!');
+
+  if (user.bannedFromWin) {
+    commitChombo(user, 'Attempted Dobon while win-banned'); return;
+  }
+
+  const mySum = user.hand.reduce((s, c) => s + (c ? c.val : 0), 0);
+  const targetVal = lastActionDiscard ? lastActionDiscard.totalVal : null;
+
+  if (targetVal !== null && mySum === targetVal && user.hand.length >= 2) {
+    stopTimer();
+    const loser = players[lastActionDiscard.playerId] || players[(user.id - direction + numPlayers) % numPlayers];
+    startDobonStandby(user, loser, lastActionDiscard);
+  } else {
+    commitChombo(user, `Hand sum (${mySum}) does not match discard (${targetVal})`);
+  }
+}
+
+function startDobonStandby(winner, loser, actionDiscard) {
+  stopTimer();
+  pendingDobonData = { winner, loser, actionDiscard };
+  dobonStandbySec = 10;
+
+  const banner = document.getElementById('dobon-gaeshi-banner');
+  const countEl = document.getElementById('gaeshi-countdown');
+  if (banner) banner.style.display = 'block';
+  if (countEl) countEl.innerText = `${dobonStandbySec}`;
+
+  updateUI();
+
+  if (!isOnlineMatch && loser.id !== 0 && loser.hand.length >= 2) {
+    const lSum = loser.hand.reduce((s, c) => s + (c ? c.val : 0), 0);
+    if (lSum === actionDiscard.totalVal && !loser.bannedFromWin) {
+      setTimeout(() => {
+        if (pendingDobonData) {
+          speakVoice(currentLang === 'ja' ? 'ドボン返し！' : 'Counter Dobon!');
+          clearDobonStandby();
+          executeDobonGaeshiWin(loser, winner);
+        }
+      }, 3500);
+    }
+  }
+
+  dobonStandbyTimer = setInterval(() => {
+    dobonStandbySec--;
+    if (countEl) countEl.innerText = `${dobonStandbySec}`;
+    if (dobonStandbySec <= 0) {
+      clearDobonStandby();
+      finalizeNormalDobon(pendingDobonData.winner, pendingDobonData.loser, pendingDobonData.actionDiscard);
+    }
+  }, 1000);
+}
+
+function clearDobonStandby() {
+  if (dobonStandbyTimer) { clearInterval(dobonStandbyTimer); dobonStandbyTimer = null; }
+  const banner = document.getElementById('dobon-gaeshi-banner');
+  if (banner) banner.style.display = 'none';
+  const seats = document.querySelectorAll('.cpu-seat');
+  seats.forEach(s => s.classList.remove('dobon-attacker'));
+}
+
+function finalizeNormalDobon(winner, loser, actionDiscard) {
+  isGameOver = true;
+  hideDrawAlertBanner();
+
+  if (actionDiscard.cards) {
+    actionDiscard.cards.forEach(c => loser.hand.push(c));
+  }
+
+  let points = 0;
+  const loserCount = calculateSpecialHandCount(loser.hand);
+
+  if (actionDiscard.cards.length === 1 && actionDiscard.cards[0].val === 2 && winner.hand.length === 2 && winner.hand.every(c => c && c.val === 1)) points = 20 * roundMultiplier;
+  else if (actionDiscard.isPon && actionDiscard.baseVal === 2) points = 80 * roundMultiplier;
+  else if (actionDiscard.isKan && actionDiscard.baseVal === 2) points = 160 * roundMultiplier;
+  else if (loser.hand.length === actionDiscard.cards.length) points = 20 * roundMultiplier;
+  else if (actionDiscard.isPon) points = 4 * loserCount * roundMultiplier;
+  else if (actionDiscard.isKan) points = 8 * loserCount * roundMultiplier;
+  else points = 2 * loserCount * roundMultiplier;
+
+  const deltas = players.map(p => (p.id === winner.id ? points : (p.id === loser.id ? -points : 0)));
+  winner.score += points; loser.score -= points;
+
+  recordRoundHistory('DOBON', deltas);
+  roundMultiplier = 1; nextRoundStarter = winner.id;
+  updateUI();
+
+  if (isOnlineMatch && socket && currentRoomId) {
+    socket.emit('dobon_declared_sync', {
+      roomId: currentRoomId,
+      winnerSeatIndex: winner.seatIndex !== undefined ? winner.seatIndex : winner.id,
+      loserSeatIndex: loser.seatIndex !== undefined ? loser.seatIndex : loser.id,
+      winType: 'DOBON',
+      points: points,
+      loserHandCount: loserCount
+    });
+  }
+
+  showOutcomeBanner(winner.id === 0);
+  showResultModal(`${winner.name} DOBON WIN!`, `<b>${winner.name}</b> の【DOBON】！<br><br>勝者: <b>${winner.name} (+${points}pt)</b><br>放銃者: <b style="color:#e74c3c;">${loser.name} (-${points}pt)</b><br>(${loser.name} 手札換算: ${loserCount}枚)<br><br>※他プレイヤーは点数変動なし`);
+  pendingDobonData = null;
+}
+
+function executeDobonGaeshiWin(winner, loser) {
+  isGameOver = true;
+  hideDrawAlertBanner();
+  const points = 20 * roundMultiplier;
+
+  const deltas = players.map(p => (p.id === winner.id ? points : (p.id === loser.id ? -points : 0)));
+  winner.score += points; loser.score -= points;
+
+  recordRoundHistory('DOBON-GAESHI', deltas);
+  roundMultiplier = 1; nextRoundStarter = winner.id;
+  updateUI();
+
+  if (isOnlineMatch && socket && currentRoomId) {
+    socket.emit('dobon_declared_sync', {
+      roomId: currentRoomId,
+      winnerSeatIndex: winner.seatIndex !== undefined ? winner.seatIndex : winner.id,
+      loserSeatIndex: loser.seatIndex !== undefined ? loser.seatIndex : loser.id,
+      winType: 'DOBON-GAESHI',
+      points: points,
+      loserHandCount: null
+    });
+  }
+
+  showOutcomeBanner(winner.id === 0);
+  showResultModal(`DOBON-GAESHI! (カウンター成立)`, `<b>${winner.name}</b> の【DOBON-GAESHI】！<br><br>勝者: <b>${winner.name} (+${points}pt)</b><br>放銃者: <b style="color:#e74c3c;">${loser.name} (-${points}pt)</b><br><br>※他プレイヤーは点数変動なし`);
+  pendingDobonData = null;
+}
+
+function calculateSpecialHandCount(hand) {
+  let count = 0, eightMult = 1;
+  hand.forEach(c => {
+    if (!c) { count += 1; return; }
+    if (c.val === 2) count += 2;
+    else count += 1;
+    if (c.val === 8) eightMult *= 2;
+  });
+  return (count + drawTwoStack) * eightMult;
+}
+
+function endRoundNormalWin(winner) {
+  isGameOver = true; stopTimer(); clearDobonStandby(); hideDrawAlertBanner();
+  let totalWin = 0;
+  const deltas = new Array(players.length).fill(0);
+  let detailHtml = `<b>${winner.name} NORMAL WIN!</b><br><br>`;
+
+  players.forEach(p => {
+    if (p.id !== winner.id) {
+      const c = calculateSpecialHandCount(p.hand);
+      const lost = c * 1 * roundMultiplier;
+      p.score -= lost; deltas[p.id] = -lost; totalWin += lost;
+      detailHtml += `${p.name}: ${c} cards (-${lost}pt)<br>`;
+    }
+  });
+
+  winner.score += totalWin; deltas[winner.id] = totalWin;
+  recordRoundHistory('NORMAL WIN', deltas);
+  roundMultiplier = 1; nextRoundStarter = winner.id;
+  updateUI();
+
+  showOutcomeBanner(winner.id === 0);
+  showResultModal(`${winner.name} WIN!`, `${detailHtml}<b>Winner: +${totalWin}pt</b>`);
+}
+
+function commitChombo(offender, reason) {
+  isGameOver = true; stopTimer(); clearDobonStandby(); hideDrawAlertBanner();
+  speakVoice(currentLang === 'ja' ? 'チョンボ！' : 'Chombo!');
+
+  const penalty = 5 * roundMultiplier;
+  let totalFine = 0;
+  const deltas = new Array(players.length).fill(0);
+
+  players.forEach(p => {
+    if (p.id !== offender.id) {
+      p.score += penalty; deltas[p.id] = penalty; totalFine += penalty;
+    }
+  });
+  offender.score -= totalFine; deltas[offender.id] = -totalFine;
+  recordRoundHistory('CHOMBO', deltas);
+
+  offender.bannedFromWin = true;
+  if (players.every(p => p.bannedFromWin)) players.forEach(p => p.bannedFromWin = false);
+  roundMultiplier *= 2;
+  nextRoundStarter = offender.id;
+  drawTwoStack = 0;
+  const ds = document.getElementById('draw-stack');
+  if (ds) ds.innerText = '0';
+  const md = document.getElementById('multiplier-display');
+  if (md) md.innerText = roundMultiplier + 'x';
+  updateUI();
+
+  if (isOnlineMatch && socket && currentRoomId) {
+    socket.emit('chombo_occurred', {
+      roomId: currentRoomId,
+      offenderSeatIndex: offender.seatIndex !== undefined ? offender.seatIndex : 0,
+      reason: reason
+    });
+  }
+
+  showChomboDoubleBanner(offender.name, roundMultiplier);
+  showResultModal('CHOMBO / FOUL', `<b>違反者: ${offender.name} (-${totalFine}pt)</b><br>${reason}<br><br><span style="color:#ff6b81; font-weight:bold;">※勝者なし・全員に点数支払い ＆ 次回得点倍率は ${roundMultiplier}x に倍々累積！</span>`);
+}
+
+function checkTenho() {
+  const targetVal = discardHistory[0].val;
+  for (let p of players) {
+    if (p.bannedFromWin) continue;
+    if (p.hand.reduce((s, c) => s + (c ? c.val : 0), 0) === targetVal) {
+      isGameOver = true; stopTimer(); hideDrawAlertBanner();
+      const pts = 20 * roundMultiplier;
+      const deltas = new Array(players.length).fill(0);
+      players.forEach(o => {
+        if (o.id !== p.id) { o.score -= pts; deltas[o.id] = -pts; }
+      });
+      const winPts = pts * (players.length - 1);
+      p.score += winPts; deltas[p.id] = winPts;
+      recordRoundHistory('TENHO', deltas);
+      nextRoundStarter = p.id;
+      updateUI();
+      showOutcomeBanner(p.id === 0);
+      showResultModal('TENHO DOBON!', `<b>${p.name}: +${winPts}pt</b>`);
+      return;
+    }
+  }
+}
+
+function cpuTurn() {
+  if (isGameOver || turnIndex === 0 || pendingDobonData || isOnlineMatch) return;
+  const cpu = players[turnIndex];
+  const top = discardHistory[discardHistory.length - 1];
+
+  if (pendingLastCheck && !players[0].declaredLast) {
+    pendingLastCheck = false;
+    commitChombo(players[0], I18N[currentLang].chomboMissLast);
+    return;
+  }
+  pendingLastCheck = false;
+
+  if (cpu.hand.length <= 2 && !cpu.declaredLast) cpu.declaredLast = true;
+
+  if (drawTwoStack > 0) {
+    const idx2 = cpu.hand.findIndex(c => c && c.val === 2);
+    if (idx2 > -1) {
+      const pl = cpu.hand[idx2];
+      playCardWithHandAnimation(cpu.id, pl, () => {
+        cpu.hand.splice(idx2, 1);
+        discardHistory.push(pl);
+        lastActionDiscard = { cards: [pl], totalVal: 2, playerId: cpu.id };
+        consecutivePassCount = 0;
+        postCardPlayEffect(pl, cpu);
+      });
+      return;
+    } else {
+      let dCount = drawTwoStack;
+      drawTwoStack = 0;
+      hideDrawAlertBanner();
+      const drawStep = () => {
+        if (dCount > 0) {
+          dCount--;
+          playDrawAnimation(cpu.id, () => {
+            drawCard(cpu);
+            drawStep();
+          });
+        } else {
+          updateUI();
+          consecutivePassCount++;
+          checkNagare();
+          passTurn(0);
+        }
+      };
+      drawStep();
+      return;
+    }
+  }
+
+  const playable = [];
+  cpu.hand.forEach((c, idx) => {
+    if (!c) return;
+    const mSuit = designatedSuit ? (c.suit === designatedSuit) : (c.suit === top.suit);
+    const mNum = (c.label === top.label);
+    if (mSuit || mNum || c.val === 8) {
+      if (cpu.hand.length === 1 && c.val === 8 && !mSuit && !mNum) return;
+      playable.push(idx);
+    }
+  });
+
+  if (playable.length > 0) {
+    const pIdx = playable[Math.floor(Math.random() * playable.length)];
+    const pl = cpu.hand[pIdx];
+
+    playCardWithHandAnimation(cpu.id, pl, () => {
+      cpu.hand.splice(pIdx, 1);
+      discardHistory.push(pl);
+      lastActionDiscard = { cards: [pl], totalVal: pl.val, playerId: cpu.id };
+      designatedSuit = null;
+      consecutivePassCount = 0;
+
+      if (pl.val === 8) {
+        const counts = {};
+        cpu.hand.forEach(c => { if (c) counts[c.suit] = (counts[c.suit] || 0) + 1; });
+        designatedSuit = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || '♠';
+      }
+      postCardPlayEffect(pl, cpu);
+    });
+  } else {
+    playDrawAnimation(cpu.id, () => {
+      drawCard(cpu);
+      if (cpu.declaredLast) cpu.declaredLast = false;
+      consecutivePassCount++;
+      checkNagare();
+      updateUI(); passTurn(0);
+    });
+  }
+}
+
+function checkCpuInterrupts(targetVal, playedPlayerId) {
+  if (isGameOver || pendingDobonData || isOnlineMatch) return false;
+
+  for (let p of players) {
+    if (p.id === 0 || p.id === playedPlayerId || p.bannedFromWin || p.hand.length < 2) continue;
+
+    if (p.hand.reduce((s, c) => s + (c ? c.val : 0), 0) === targetVal) {
+      setTimeout(() => {
+        if (!isGameOver && !pendingDobonData) {
+          speakVoice(currentLang === 'ja' ? 'ドボン！' : 'Dobon!');
+          const loser = players[playedPlayerId];
+          startDobonStandby(p, loser, lastActionDiscard);
+        }
+      }, 500);
+      return true;
+    }
+  }
+  return false;
+}
+
+// ==========================================
+// 履歴管理（セッション独立計上）
+// ==========================================
+function getNextSessionNumber() {
+  if (setScoreHistory.length === 0) return 1;
+  return Math.max(...setScoreHistory.map(s => s.set)) + 1;
+}
+
+function recordRoundHistory(type, deltas) {
+  if (currentRound === 1 && (!setScoreHistory.length || setScoreHistory[setScoreHistory.length - 1].rounds.length > 0)) {
+    currentSet = getNextSessionNumber();
+  }
+
+  let setObj = setScoreHistory.find(s => s.set === currentSet);
+  if (!setObj) {
+    setObj = { set: currentSet, rounds: [] };
+    setScoreHistory.push(setObj);
+  }
+
+  setObj.rounds.push({
+    round: currentRound, type, deltas: [...deltas],
+    scoresAfter: players.map(p => p.score)
+  });
+  localStorage.setItem('dobon_permanent_history', JSON.stringify(setScoreHistory));
+}
+
+function openScoreHistoryModal() {
+  const container = document.getElementById('accordion-history-container');
+  if (!container) return;
+  if (setScoreHistory.length === 0) {
+    container.innerHTML = '<div style="font-size:11px; color:#888; text-align:center; padding:15px;">対戦履歴はありません。</div>';
+  } else {
+    let html = '';
+    setScoreHistory.forEach((sObj, sIdx) => {
+      const totals = new Array(players.length).fill(0);
+      sObj.rounds.forEach(r => r.deltas.forEach((d, pIdx) => totals[pIdx] += d));
+      const champIdx = totals.indexOf(Math.max(...totals));
+      const champName = players[champIdx] ? players[champIdx].name : `P${champIdx}`;
+
+      html += `
+        <div class="accordion-item" id="acc-item-${sIdx}">
+          <div class="accordion-header" onclick="toggleAccordion(${sIdx})">
+            <span>SESSION ${sObj.set} (計${sObj.rounds.length}回) | 🏆 ${champName}</span>
+            <span id="acc-arrow-${sIdx}">▼</span>
+          </div>
+          <div class="accordion-content">
+            <div style="font-size:10px; margin-bottom:5px; color:var(--gold);">Total: ${players.map((p, i) => `${p.name}: ${totals[i]}pt`).join(' | ')}</div>
+            <table class="history-table">
+              <thead><tr><th>R</th><th>TYPE</th>${players.map(p => `<th>${p.name}</th>`).join('')}</tr></thead>
+              <tbody>
+                ${sObj.rounds.map(r => `
+                  <tr>
+                    <td>${r.round}</td><td>${r.type}</td>
+                    ${r.deltas.map((d, i) => `<td style="color:${d > 0 ? '#2ecc71' : (d < 0 ? '#e74c3c' : '#aaa')}">${d > 0 ? `+${d}` : d}<br>(${r.scoresAfter[i]})</td>`).join('')}
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+  }
+  const hm = document.getElementById('history-modal');
+  if (hm) hm.style.display = 'flex';
+}
+
+function toggleAccordion(sIdx) {
+  const el = document.getElementById(`acc-item-${sIdx}`);
+  if (el) {
+    el.classList.toggle('open');
+    const arr = document.getElementById(`acc-arrow-${sIdx}`);
+    if (arr) arr.innerText = el.classList.contains('open') ? '▲' : '▼';
+  }
+}
+
+function closeScoreHistoryModal() {
+  const hm = document.getElementById('history-modal');
+  if (hm) hm.style.display = 'none';
+}
+
+function showResultModal(title, html) {
+  const rt = document.getElementById('result-title');
+  if (rt) rt.innerText = title;
+  const rd = document.getElementById('result-detail');
+  if (rd) rd.innerHTML = html;
+  const rm = document.getElementById('result-modal');
+  if (rm) rm.style.display = 'flex';
+  const mb = document.getElementById('minimized-restore-bar');
+  if (mb) mb.style.display = 'none';
+}
+
+function toggleMinimizeResult() {
+  const m = document.getElementById('result-modal');
+  const b = document.getElementById('minimized-restore-bar');
+  if (!m || !b) return;
+  if (m.style.display === 'none') {
+    m.style.display = 'flex'; b.style.display = 'none';
+  } else {
+    m.style.display = 'none'; b.style.display = 'block';
+  }
+}
+
+function nextRound() {
+  stopConfetti();
+  hideOutcomeBanner();
+  const rm = document.getElementById('result-modal');
+  if (rm) rm.style.display = 'none';
+  const mb = document.getElementById('minimized-restore-bar');
+  if (mb) mb.style.display = 'none';
+
+  if (currentRound % 10 === 0) {
+    showChampionshipResult();
+  } else {
+    currentRound++;
+    startRound();
+  }
+}
+
+function showChampionshipResult() {
+  const sorted = [...players].sort((a, b) => b.score - a.score);
+  const champ = sorted[0];
+
+  let html = `<div style="text-align:center; font-size:14px; margin-bottom:10px;">
+    <b>🏆 WINNER: <span style="color:var(--gold); font-size:18px;">${champ.name}</span> (${champ.score} pt)</b>
+  </div><table class="history-table"><thead><tr><th>RANK</th><th>PLAYER</th><th>SCORE</th></tr></thead><tbody>`;
+
+  sorted.forEach((p, idx) => {
+    html += `<tr><td>${idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : idx + 1))}</td><td><b>${p.name}</b></td><td style="color:var(--gold); font-weight:bold;">${p.score} pt</td></tr>`;
+  });
+  html += '</tbody></table>';
+
+  const cr = document.getElementById('champ-rankings');
+  if (cr) cr.innerHTML = html;
+  const cm = document.getElementById('championship-modal');
+  if (cm) cm.style.display = 'flex';
+}
+
+function continueChampionship() {
+  const cm = document.getElementById('championship-modal');
+  if (cm) cm.style.display = 'none';
+  currentRound++;
+  startRound();
+}
+
+function resetChampionship() {
+  const cm = document.getElementById('championship-modal');
+  if (cm) cm.style.display = 'none';
+  players.forEach(p => { p.score = 0; p.bannedFromWin = false; });
+  currentRound = 1;
+  currentSet = getNextSessionNumber();
+  startRound();
+}

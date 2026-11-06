@@ -4,10 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="application-name" content="DOBON Master">
-<meta name="version" content="2026.00.005">
-<title>DOBON - Las Vegas VIP Lounge (2026.00.005)</title>
+<meta name="version" content="2026.00.004">
+<title>DOBON - Las Vegas VIP Lounge (2026.00.004)</title>
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css?v=202600005">
+<!-- キャッシュバスター付きCSS -->
+<link rel="stylesheet" href="style.css?v=202600004">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0806">
@@ -18,6 +19,7 @@
 <canvas id="confetti-canvas"></canvas>
 <div id="round-outcome-banner"></div>
 
+<!-- チョンボ時×2倍強調バナー -->
 <div id="chombo-double-banner">
   <div class="chombo-txt-top">CHOMBO / FOUL!</div>
   <div class="chombo-txt-main">NEXT ROUND ALL POINTS ×2 !!</div>
@@ -26,6 +28,7 @@
 
 <div id="casino-bg"></div>
 
+<!-- ヘッダー -->
 <header>
   <div style="display:flex; gap:4px; align-items:center;">
     <button class="header-btn" onclick="toggleLang()" id="lang-btn">EN</button>
@@ -38,10 +41,11 @@
     <div>R<span id="round-num" style="color:var(--gold); font-weight:bold;">1</span> <span class="mult-tag" id="multiplier-display">1x</span></div>
     <button class="header-btn" onclick="openScoreHistoryModal()">HISTORY</button>
     <div><b id="user-sum" style="color:var(--gold);">0</b></div>
-    <span class="version-tag" title="Game Version">v2026.00.005</span>
+    <span class="version-tag" title="Game Version">v2026.00.004</span>
   </div>
 </header>
 
+<!-- メッセージ専用スリムバー -->
 <div id="status-bar-container">
   <span id="status-msg">READY</span>
 </div>
@@ -55,10 +59,12 @@
       DOBON! COUNTER CHANCE: <span id="gaeshi-countdown">10</span>s
     </div>
 
+    <!-- ポン・カン一時停止中バナー -->
     <div id="naki-pause-banner">
       <span id="naki-pause-text">相手がPON/KAN宣言中...</span>
     </div>
 
+    <!-- 中央エリア（山札＆捨て札） -->
     <div id="center-table-field">
       <div style="text-align:center;">
         <div class="deck-3d-stack" onclick="onDeckClick()">
@@ -75,6 +81,7 @@
       </div>
     </div>
 
+    <!-- 手前側HUD -->
     <div id="hud-time-container">
       <span id="dir-display" style="font-size:11px; font-weight:bold;">CCW</span>
       <div id="timer-badge">TIME: <span id="timer-sec">--</span></div>
@@ -91,6 +98,7 @@
   <div id="flying-draw-card"></div>
 </div>
 
+<!-- 操作ボタンバー -->
 <div id="table-control-bar">
   <button class="btn-dobon-huge" id="dobon-btn" onclick="triggerUserDobon()">DOBON</button>
   <div id="naki-center-group">
@@ -105,12 +113,14 @@
   <button class="btn-skip-round" id="skip-chombo-btn" onclick="skipChomboRound()">SKIP ROUND (-10pt)</button>
 </div>
 
+<!-- ユーザー手札 -->
 <div id="user-fan-area">
   <div id="user-turn-badge">▼ YOUR TURN ▼</div>
   <div id="user-fan"></div>
   <img class="user-grip-img" src="me.png" alt="My Hand">
 </div>
 
+<!-- 8マーク選択 -->
 <div id="suit-select-floating">
   <div style="font-size:13px; margin-bottom:8px; color:#333; font-weight:bold;" id="txt-choose-suit">SELECT SUIT</div>
   <button class="suit-btn" style="color:#11141a;" onclick="selectSuit('♠')">♠</button>
@@ -119,14 +129,16 @@
   <button class="suit-btn" style="color:#11141a;" onclick="selectSuit('♣')">♣</button>
 </div>
 
+<!-- 【完全刷新】スタート画面（ワンタップで迷わず開始できる動線） -->
 <div class="modal-overlay" id="start-modal">
   <div class="modal-content" style="max-width:92%; width:360px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
       <h2 style="margin:0; color:var(--gold); font-family:Georgia, serif; letter-spacing:1px;">DOBON MASTER</h2>
-      <span class="version-tag">v2026.00.005</span>
+      <span class="version-tag">v2026.00.004</span>
     </div>
     <div style="font-size:10px; color:#888; margin-bottom:14px;">Unofficial Tournament Standard - San Diego Edition</div>
     
+    <!-- メイン開始ボタン2つ（押せば即座に動く！） -->
     <button class="modal-btn" style="width:100%; padding:14px; font-size:15px; margin-bottom:10px;" onclick="startCpuDirect()">
       🤖 一人で遊ぶ (VS CPU)
     </button>
@@ -134,10 +146,12 @@
       🌐 オンライン対戦 (MULTIPLAYER)
     </button>
 
+    <!-- 中断データがある場合のみ表示 -->
     <button class="modal-btn modal-btn-sub" id="resume-btn" style="width:100%; padding:10px; margin-bottom:12px; display:none;" onclick="resumeGame()">
       ▶️ RESUME (前回の続きから再開)
     </button>
 
+    <!-- 折りたたみ式CPU詳細設定 -->
     <div style="border-top:1px solid rgba(245,205,121,0.25); padding-top:10px; text-align:left;">
       <div style="font-size:11px; color:var(--gold); cursor:pointer; font-weight:bold; display:flex; justify-content:space-between;" onclick="toggleConfigAccordion()">
         <span>⚙️ CPU戦の設定（人数・持ち時間）</span>
@@ -173,6 +187,7 @@
   </div>
 </div>
 
+<!-- オンラインロビーモーダル -->
 <div class="modal-overlay" id="online-lobby-modal" style="display:none;">
   <div class="modal-content" style="max-width:94%; width:400px; padding:16px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -180,6 +195,7 @@
       <button class="header-btn" onclick="fetchRoomList()">更新 🔄</button>
     </div>
 
+    <!-- クイックマッチボタン -->
     <button class="modal-btn" style="width:100%; background:linear-gradient(135deg,#e67e22,#d35400); color:#fff; padding:12px; font-size:14px; margin-bottom:10px;" onclick="startQuickMatch()">
       ⚡ クイックマッチ (自動マッチング)
     </button>
@@ -189,20 +205,24 @@
       <input type="text" id="lobby-search-query" oninput="filterAndRenderRooms()" placeholder="🔍 部屋名検索..." style="flex:1.5; font-size:12px; padding:6px; background:#0c1710; color:#fff; border:1px solid var(--gold); border-radius:5px;">
     </div>
 
+    <!-- フィルター -->
     <div style="display:flex; gap:6px; margin-bottom:8px; font-size:10px;">
       <button class="header-btn" id="filter-all-btn" style="background:var(--gold); color:#111;" onclick="setLobbyFilter('all')">すべて</button>
       <button class="header-btn" id="filter-open-btn" onclick="setLobbyFilter('open')">すぐ入れる部屋のみ</button>
       <button class="header-btn" id="filter-spec-btn" onclick="setLobbyFilter('spec')">観戦可能</button>
     </div>
 
+    <!-- 最近入った部屋 -->
     <div style="font-size:10px; text-align:left; color:#a4b0be; margin-bottom:2px;">最近入った部屋:</div>
     <div id="recent-rooms-container" style="display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; min-height:20px;"></div>
 
+    <!-- 部屋一覧リスト -->
     <div style="font-size:10px; text-align:left; color:#a4b0be; margin-bottom:4px;">部屋一覧 (タップして入室/観戦):</div>
     <div id="lobby-room-container" style="max-height:140px; overflow-y:auto; margin-bottom:10px; text-align:left;">
       <div style="font-size:11px; color:#888; text-align:center; padding:12px;">部屋情報を取得中...</div>
     </div>
 
+    <!-- 部屋作成フォーム -->
     <div style="border-top:1px solid rgba(245,205,121,0.3); padding-top:8px; margin-bottom:8px; text-align:left;">
       <div style="font-size:11px; color:#a4b0be; margin-bottom:4px; font-weight:bold;">新しい部屋を作成:</div>
       <div style="display:flex; gap:4px; margin-bottom:6px;">
@@ -236,6 +256,7 @@
   </div>
 </div>
 
+<!-- パスワード入力モーダル -->
 <div class="modal-overlay" id="password-input-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:300px;">
     <h3 style="margin:2px 0 8px; color:var(--gold);">PASSWORD</h3>
@@ -246,6 +267,7 @@
   </div>
 </div>
 
+<!-- 部屋待機画面モーダル -->
 <div class="modal-overlay" id="room-detail-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:340px;">
     <h3 id="room-detail-title" style="margin:2px 0 4px; color:var(--gold);">WAITING ROOM</h3>
@@ -263,6 +285,7 @@
   </div>
 </div>
 
+<!-- 進行中ラウンドの流し投票モーダル -->
 <div class="modal-overlay" id="vote-abort-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:320px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">JOIN REQUEST</h3>
@@ -274,6 +297,7 @@
   </div>
 </div>
 
+<!-- 卓人数拡張投票モーダル -->
 <div class="modal-overlay" id="vote-expand-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:320px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">TABLE EXPAND</h3>
@@ -285,6 +309,7 @@
   </div>
 </div>
 
+<!-- WIN画面 -->
 <div class="modal-overlay" id="result-modal" style="display:none;">
   <div class="modal-content">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -302,6 +327,7 @@
 
 <div class="minimized-banner" id="minimized-restore-bar" onclick="toggleMinimizeResult()">▲ RESTORE RESULT DIALOG ▲</div>
 
+<!-- 点数表モーダル -->
 <div class="modal-overlay" id="payout-modal" style="display:none;">
   <div class="modal-content" style="max-width:96%; width:440px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">PAYOUT TABLE</h3>
@@ -333,6 +359,7 @@
   </div>
 </div>
 
+<!-- 10回終了時大会表彰 -->
 <div class="modal-overlay" id="championship-modal" style="display:none;">
   <div class="modal-content">
     <h2 style="margin:2px 0 8px; color:var(--gold); font-family:Georgia, serif;">★ CHAMPIONSHIP RESULT ★</h2>
@@ -343,6 +370,7 @@
   </div>
 </div>
 
+<!-- 履歴モーダル -->
 <div class="modal-overlay" id="history-modal" style="display:none;">
   <div class="modal-content" style="max-width:96%; width:440px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">CHAMPIONSHIP HISTORY</h3>
@@ -352,8 +380,8 @@
 </div>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script src="game.js?v=202600005"></script>
-<script src="online.js?v=202600005"></script>
+<!-- キャッシュバスター付きJavaScript -->
+<script src="game.js?v=202600004"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});

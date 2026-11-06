@@ -372,9 +372,9 @@
 </div>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<!-- 分割された通信スクリプト ＆ メインゲームスクリプト -->
-<script src="online.js?v=202600005"></script>
+<!-- 読み込み順序修正：コアUI/ゲームロジック -> オンライン通信 -->
 <script src="game.js?v=202600005"></script>
+<script src="online.js?v=202600005"></script>
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});

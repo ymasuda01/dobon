@@ -7,7 +7,6 @@
 <meta name="version" content="2026.00.005">
 <title>DOBON - Las Vegas VIP Lounge (2026.00.005)</title>
 <link rel="manifest" href="manifest.json">
-<!-- キャッシュバスター付きCSS -->
 <link rel="stylesheet" href="style.css?v=202600005">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -19,7 +18,6 @@
 <canvas id="confetti-canvas"></canvas>
 <div id="round-outcome-banner"></div>
 
-<!-- チョンボ時×2倍強調バナー -->
 <div id="chombo-double-banner">
   <div class="chombo-txt-top">CHOMBO / FOUL!</div>
   <div class="chombo-txt-main">NEXT ROUND ALL POINTS ×2 !!</div>
@@ -28,7 +26,6 @@
 
 <div id="casino-bg"></div>
 
-<!-- ヘッダー -->
 <header>
   <div style="display:flex; gap:4px; align-items:center;">
     <button class="header-btn" onclick="toggleLang()" id="lang-btn">EN</button>
@@ -45,7 +42,6 @@
   </div>
 </header>
 
-<!-- メッセージ専用スリムバー -->
 <div id="status-bar-container">
   <span id="status-msg">READY</span>
 </div>
@@ -59,12 +55,10 @@
       DOBON! COUNTER CHANCE: <span id="gaeshi-countdown">10</span>s
     </div>
 
-    <!-- ポン・カン一時停止中バナー -->
     <div id="naki-pause-banner">
       <span id="naki-pause-text">相手がPON/KAN宣言中...</span>
     </div>
 
-    <!-- 中央エリア（山札＆捨て札） -->
     <div id="center-table-field">
       <div style="text-align:center;">
         <div class="deck-3d-stack" onclick="onDeckClick()">
@@ -81,7 +75,6 @@
       </div>
     </div>
 
-    <!-- 手前側HUD -->
     <div id="hud-time-container">
       <span id="dir-display" style="font-size:11px; font-weight:bold;">CCW</span>
       <div id="timer-badge">TIME: <span id="timer-sec">--</span></div>
@@ -98,7 +91,6 @@
   <div id="flying-draw-card"></div>
 </div>
 
-<!-- 操作ボタンバー -->
 <div id="table-control-bar">
   <button class="btn-dobon-huge" id="dobon-btn" onclick="triggerUserDobon()">DOBON</button>
   <div id="naki-center-group">
@@ -113,14 +105,12 @@
   <button class="btn-skip-round" id="skip-chombo-btn" onclick="skipChomboRound()">SKIP ROUND (-10pt)</button>
 </div>
 
-<!-- ユーザー手札 -->
 <div id="user-fan-area">
   <div id="user-turn-badge">▼ YOUR TURN ▼</div>
   <div id="user-fan"></div>
   <img class="user-grip-img" src="me.png" alt="My Hand">
 </div>
 
-<!-- 8マーク選択 -->
 <div id="suit-select-floating">
   <div style="font-size:13px; margin-bottom:8px; color:#333; font-weight:bold;" id="txt-choose-suit">SELECT SUIT</div>
   <button class="suit-btn" style="color:#11141a;" onclick="selectSuit('♠')">♠</button>
@@ -129,7 +119,6 @@
   <button class="suit-btn" style="color:#11141a;" onclick="selectSuit('♣')">♣</button>
 </div>
 
-<!-- スタート画面 -->
 <div class="modal-overlay" id="start-modal">
   <div class="modal-content" style="max-width:92%; width:360px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
@@ -184,7 +173,6 @@
   </div>
 </div>
 
-<!-- オンラインロビーモーダル -->
 <div class="modal-overlay" id="online-lobby-modal" style="display:none;">
   <div class="modal-content" style="max-width:94%; width:400px; padding:16px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -248,7 +236,6 @@
   </div>
 </div>
 
-<!-- パスワード入力モーダル -->
 <div class="modal-overlay" id="password-input-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:300px;">
     <h3 style="margin:2px 0 8px; color:var(--gold);">PASSWORD</h3>
@@ -259,7 +246,6 @@
   </div>
 </div>
 
-<!-- 部屋待機画面モーダル -->
 <div class="modal-overlay" id="room-detail-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:340px;">
     <h3 id="room-detail-title" style="margin:2px 0 4px; color:var(--gold);">WAITING ROOM</h3>
@@ -277,7 +263,6 @@
   </div>
 </div>
 
-<!-- 進行中ラウンドの流し投票モーダル -->
 <div class="modal-overlay" id="vote-abort-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:320px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">JOIN REQUEST</h3>
@@ -289,7 +274,6 @@
   </div>
 </div>
 
-<!-- 卓人数拡張投票モーダル -->
 <div class="modal-overlay" id="vote-expand-modal" style="display:none;">
   <div class="modal-content" style="max-width:92%; width:320px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">TABLE EXPAND</h3>
@@ -301,7 +285,6 @@
   </div>
 </div>
 
-<!-- WIN画面 -->
 <div class="modal-overlay" id="result-modal" style="display:none;">
   <div class="modal-content">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -319,7 +302,6 @@
 
 <div class="minimized-banner" id="minimized-restore-bar" onclick="toggleMinimizeResult()">▲ RESTORE RESULT DIALOG ▲</div>
 
-<!-- 点数表モーダル -->
 <div class="modal-overlay" id="payout-modal" style="display:none;">
   <div class="modal-content" style="max-width:96%; width:440px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">PAYOUT TABLE</h3>
@@ -351,7 +333,6 @@
   </div>
 </div>
 
-<!-- 10回終了時大会表彰 -->
 <div class="modal-overlay" id="championship-modal" style="display:none;">
   <div class="modal-content">
     <h2 style="margin:2px 0 8px; color:var(--gold); font-family:Georgia, serif;">★ CHAMPIONSHIP RESULT ★</h2>
@@ -362,7 +343,6 @@
   </div>
 </div>
 
-<!-- 履歴モーダル -->
 <div class="modal-overlay" id="history-modal" style="display:none;">
   <div class="modal-content" style="max-width:96%; width:440px;">
     <h3 style="margin:2px 0 6px; color:var(--gold);">CHAMPIONSHIP HISTORY</h3>
@@ -372,7 +352,6 @@
 </div>
 
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<!-- 読み込み順序修正：コアUI/ゲームロジック -> オンライン通信 -->
 <script src="game.js?v=202600005"></script>
 <script src="online.js?v=202600005"></script>
 <script>

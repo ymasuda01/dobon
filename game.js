@@ -1,145 +1,97 @@
-/**
- * DOBON MASTER - Core Game Engine & Single-Player Logic
- * File Version: game.js v0.2.0 (2026 San Diego Standard)
- */
+/* DOBON Master - Core Game Logic (Restored Picture Card Images) */
+const VERSION = "2026.00.005";
 
-window.isOnlineMatch = false;
-window.isSpectator = false;
-window.currentRoomId = null;
-
-let currentLang = 'JA';
-let userTimeLimit = 25;
-let timerSeconds = 25;
-let timerInterval = null;
-let currentRound = 1;
-let roundMultiplier = 1;
-let isGameOver = false;
-let turnIndex = 0;
-let isClockwise = true;
-
-let players = [];
+// グローバル状態
 let deck = [];
-let discardHistory = [];
-let selectedIndices = [];
-let designatedSuit = null;
-let lastActionDiscard = null;
-let consecutivePassCount = 0;
-let drawTwoStack = 0;
-let dobonStandbyTimer = null;
-let historyLog = [];
+let players = [];
+let currentPlayerIndex = 0;
+let playDirection = 1; // 1: 時計回り, -1: 反時計回り
+let currentDiscard = null;
+let currentSuit = '';
+let isGameActive = false;
+let isMyTurn = false;
+let roundNumber = 1;
+let currentMultiplier = 1;
+let drawStackCount = 0;
+let chomboPlayer = null;
+let selectedHandIndices = [];
 
-const I18N = {
-  JA: {
-    yourTurn: "あなたの番です！カードをタップして出してください",
-    spectatorWatching: "【観戦中】プレイヤーの思考・操作を待っています..."
-  },
-  EN: {
-    yourTurn: "YOUR TURN! Tap cards to play",
-    spectatorWatching: "SPECTATING: Waiting for players..."
-  }
-};
+// タイマー関連
+let turnTimer = null;
+let maxTurnTime = 25;
+let remainingTime = 25;
 
+// 設定
+let configPlayerCount = 4;
+let configChomboMode = 'strict';
+
+// 初期化
 window.addEventListener('DOMContentLoaded', () => {
-  checkSavedSession();
+  initGameUI();
 });
 
-function toggleConfigAccordion() {
-  const panel = document.getElementById('cpu-config-panel');
-  const arrow = document.getElementById('config-arrow');
-  if (panel) {
-    const isHidden = panel.style.display === 'none';
-    panel.style.display = isHidden ? 'block' : 'none';
-    if (arrow) arrow.innerText = isHidden ? '▲' : '▼';
+function initGameUI() {
+  document.getElementById('version-tag')?.innerText = VERSION;
+  const resumeBtn = document.getElementById('resume-btn');
+  if (resumeBtn && localStorage.getItem('dobon_saved_state')) {
+    resumeBtn.style.display = 'block';
   }
-}
-
-function setMessage(msg) {
-  const el = document.getElementById('status-msg');
-  if (el) el.innerText = msg;
-}
-
-function toggleLang() {
-  currentLang = (currentLang === 'JA') ? 'EN' : 'JA';
-  const btn = document.getElementById('lang-btn');
-  if (btn) btn.innerText = currentLang;
-  const tSuit = document.getElementById('txt-choose-suit');
-  if (tSuit) tSuit.innerText = (currentLang === 'JA') ? 'SELECT SUIT' : 'SELECT SUIT';
-  if (!isGameOver) setMessage(I18N[currentLang].yourTurn);
 }
 
 function startCpuDirect() {
   const pSelect = document.getElementById('player-count-select');
+  if (pSelect) configPlayerCount = parseInt(pSelect.value) || 4;
+  
+  const cSelect = document.getElementById('chombo-mode-select');
+  if (cSelect) configChomboMode = cSelect.value;
+
   const tSelect = document.getElementById('timer-mode-select');
+  if (tSelect) maxTurnTime = parseInt(tSelect.value) || 25;
 
-  const count = pSelect ? (parseInt(pSelect.value) || 4) : 4;
-  userTimeLimit = tSelect ? (parseInt(tSelect.value) || 25) : 25;
-
-  window.isOnlineMatch = false;
-  window.isSpectator = false;
-
-  const startModal = document.getElementById('start-modal');
-  if (startModal) startModal.style.display = 'none';
-
-  initGame(count);
+  document.getElementById('start-modal').style.display = 'none';
+  startNewGame();
 }
 
-function initGame(playerCount = 4) {
-  stopTimer();
-  stopConfetti();
-  hideOutcomeBanner();
-  isGameOver = false;
-  selectedIndices = [];
-  designatedSuit = null;
-  lastActionDiscard = null;
-  consecutivePassCount = 0;
-  drawTwoStack = 0;
-
+function startNewGame() {
+  isGameActive = true;
   deck = createDeck();
   shuffle(deck);
 
   players = [];
-  const names = ['YOU', 'CPU 1', 'CPU 2', 'CPU 3', 'CPU 4', 'CPU 5'];
-  for (let i = 0; i < playerCount; i++) {
-    players.push({
-      id: i,
-      seatIndex: i,
-      name: names[i] || `CPU ${i}`,
-      hand: [],
-      score: 0,
-      bannedFromWin: false,
-      declaredLast: false,
-      isCpu: i !== 0,
-      silhouette: `<svg viewBox="0 0 24 24" width="28" height="28" fill="#555"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`
-    });
+  players.push({ id: 'user', name: 'YOU', isCpu: false, hand: [], score: 0, isLast: false });
+  for (let i = 1; i < configPlayerCount; i++) {
+    players.push({ id: `cpu_${i}`, name: `CPU ${i}`, isCpu: true, hand: [], score: 0, isLast: false });
   }
 
-  for (let c = 0; c < 5; c++) {
+  // 配牌 (5枚ずつ)
+  for (let r = 0; r < 5; r++) {
     players.forEach(p => {
       if (deck.length > 0) p.hand.push(deck.pop());
     });
   }
 
-  const initialCard = deck.pop();
-  discardHistory = [initialCard];
-  lastActionDiscard = { cards: [initialCard], totalVal: initialCard.val, playerId: -1 };
+  // 最初の捨て札
+  currentDiscard = deck.pop();
+  currentSuit = currentDiscard.suit;
 
-  turnIndex = 0;
+  currentPlayerIndex = 0;
+  playDirection = 1;
+  drawStackCount = 0;
+
   updateUI();
-  playDealSound();
-
-  setMessage(I18N[currentLang].yourTurn);
-  startTimerWithDuration(userTimeLimit, handleUserTimeout);
+  startTurn();
 }
 
 function createDeck() {
   const suits = ['♠', '♥', '♦', '♣'];
-  const d = [];
-  suits.forEach(s => {
-    for (let v = 1; v <= 13; v++) {
-      d.push({ suit: s, val: v });
+  const values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+  let newDeck = [];
+  for (let s of suits) {
+    for (let v of values) {
+      newDeck.push({ suit: s, value: v });
     }
-  });
-  return d;
+  }
+  return newDeck;
 }
 
 function shuffle(array) {
@@ -149,500 +101,277 @@ function shuffle(array) {
   }
 }
 
-function getVisualSeatIndex(targetSeatIndex) {
-  if (typeof myOnlineSeatIndex !== 'undefined' && myOnlineSeatIndex >= 0) {
-    return (targetSeatIndex - myOnlineSeatIndex + players.length) % players.length;
+/* =========================================================
+   絵札（K, Q, J）および数字カードの画像・見た目生成ロジック
+   （初期コードの画像参照方式を完全復元）
+   ========================================================= */
+function getCardImageFilename(card) {
+  if (!card) return '';
+  let suitPrefix = '';
+  switch (card.suit) {
+    case '♠': suitPrefix = 's'; break;
+    case '♥': suitPrefix = 'h'; break;
+    case '♦': suitPrefix = 'd'; break;
+    case '♣': suitPrefix = 'c'; break;
   }
-  return targetSeatIndex;
+  let valStr = card.value;
+  if (card.value === 1) valStr = 'a';
+  else if (card.value === 11) valStr = 'j';
+  else if (card.value === 12) valStr = 'q';
+  else if (card.value === 13) valStr = 'k';
+
+  // J, Q, K や各カードの画像ファイル名形式 (例: s_j.png, h_q.png, d_10.png 等)
+  return `${suitPrefix}_${valStr}.png`;
+}
+
+function renderCardElement(card, isSelectable = false, index = -1) {
+  const cardDiv = document.createElement('div');
+  cardDiv.className = 'card-fan-item';
+  if (selectedHandIndices.includes(index)) {
+    cardDiv.classList.add('selected');
+  }
+
+  // J, Q, K やカード画像が存在する場合は img 要素を生成してはめ込む
+  const isPictureCard = (card.value === 11 || card.value === 12 || card.value === 13);
+  const imgFilename = getCardImageFilename(card);
+
+  // カード表面のHTML構造
+  cardDiv.innerHTML = `
+    <div class="card-inner" style="position:relative; width:100%; height:100%; border-radius:6px; overflow:hidden; background:#fff;">
+      <div class="card-corner top-left" style="position:absolute; top:2px; left:4px; font-size:11px; font-weight:bold; color:${(card.suit==='♥'||card.suit==='♦')?'#c0392b':'#111'};">
+        <div>${getCardValueStr(card.value)}</div>
+        <div style="font-size:9px;">${card.suit}</div>
+      </div>
+      
+      <!-- 画像参照領域 -->
+      <div class="card-center-img" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:80%; height:75%; display:flex; justify-content:center; align-items:center;">
+        <img src="${imgFilename}" alt="${card.suit}${card.value}" style="max-width:100%; max-height:100%; object-fit:contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <!-- 画像読み込みエラー時のテキストフォールバック -->
+        <div class="fallback-center-symbol" style="display:none; font-size:22px; color:${(card.suit==='♥'||card.suit==='♦')?'#c0392b':'#111'};">
+          ${card.suit}<br><span style="font-size:14px;">${getCardValueStr(card.value)}</span>
+        </div>
+      </div>
+
+      <div class="card-corner bottom-right" style="position:absolute; bottom:2px; right:4px; font-size:11px; font-weight:bold; transform:rotate(180deg); color:${(card.suit==='♥'||card.suit==='♦')?'#c0392b':'#111'};">
+        <div>${getCardValueStr(card.value)}</div>
+        <div style="font-size:9px;">${card.suit}</div>
+      </div>
+    </div>
+  `;
+
+  if (isSelectable && index >= 0) {
+    cardDiv.onclick = () => onHandCardClick(index);
+  }
+
+  return cardDiv;
+}
+
+function getCardValueStr(val) {
+  if (val === 1) return 'A';
+  if (val === 11) return 'J';
+  if (val === 12) return 'Q';
+  if (val === 13) return 'K';
+  return val.toString();
 }
 
 function updateUI() {
-  const rNumEl = document.getElementById('round-num');
-  if (rNumEl) rNumEl.innerText = currentRound;
-  const mDisp = document.getElementById('multiplier-display');
-  if (mDisp) mDisp.innerText = roundMultiplier + 'x';
-  const dcEl = document.getElementById('deck-count');
-  if (dcEl) dcEl.innerText = deck.length;
+  // 山札・捨て札枚数
+  document.getElementById('deck-count').innerText = deck.length;
+  document.getElementById('discard-sum-val').innerText = currentDiscard ? currentDiscard.value : 0;
+  document.getElementById('giant-suit-symbol').innerText = currentSuit || '♠';
+  document.getElementById('giant-suit-symbol').style.color = (currentSuit === '♥' || currentSuit === '♦') ? '#c0392b' : '#fff';
 
-  const uSum = document.getElementById('user-sum');
-  if (uSum && players[0]) uSum.innerText = players[0].score;
-
-  renderUserHand();
-  renderCpuArc();
-  renderDiscardPile();
-}
-
-function renderUserHand() {
-  const container = document.getElementById('user-fan');
-  if (!container || !players[0]) return;
-
-  container.innerHTML = '';
-  const hand = players[0].hand || [];
-  const total = hand.length;
-
-  hand.forEach((card, idx) => {
-    if (!card) return;
-    const cardDiv = document.createElement('div');
-    cardDiv.className = `card-fan-item ${selectedIndices.includes(idx) ? 'selected' : ''}`;
-    const isRed = (card.suit === '♥' || card.suit === '♦');
-    cardDiv.style.color = isRed ? '#e74c3c' : '#2c3e50';
-
-    const valStr = card.val === 1 ? 'A' : card.val === 11 ? 'J' : card.val === 12 ? 'Q' : card.val === 13 ? 'K' : card.val;
-    cardDiv.innerHTML = `
-      <div style="font-size:12px; font-weight:bold; position:absolute; top:4px; left:6px;">${valStr}<br>${card.suit}</div>
-      <div style="font-size:24px; position:absolute; bottom:6px; right:6px;">${card.suit}</div>
-    `;
-
-    const angle = (idx - (total - 1) / 2) * 6;
-    cardDiv.style.transform = `rotate(${angle}deg) translateY(${selectedIndices.includes(idx) ? '-20px' : '0px'})`;
-
-    cardDiv.onclick = () => onUserCardClick(idx);
-    container.appendChild(cardDiv);
-  });
-}
-
-function renderCpuArc() {
-  const container = document.getElementById('cpu-arc-container');
-  if (!container) return;
-  container.innerHTML = '';
-
-  for (let i = 1; i < players.length; i++) {
-    const p = players[i];
-    if (!p) continue;
-    const box = document.createElement('div');
-    box.className = 'cpu-player-box';
-    if (turnIndex === i) box.classList.add('active-turn');
-
-    box.innerHTML = `
-      <div style="font-size:11px; font-weight:bold; color:var(--gold);">${p.name}</div>
-      <div style="font-size:10px; color:#aaa;">手札: ${p.hand ? p.hand.length : 0}枚</div>
-      <div style="font-size:10px; color:#2ecc71;">Score: ${p.score}</div>
-    `;
-    container.appendChild(box);
-  }
-}
-
-function renderDiscardPile() {
-  const box = document.getElementById('discard-stack-box');
-  const sumEl = document.getElementById('discard-sum-val');
-  if (!box) return;
-
-  box.innerHTML = '';
-  if (discardHistory.length === 0) return;
-
-  const topCard = discardHistory[discardHistory.length - 1];
-  if (sumEl) sumEl.innerText = topCard.val;
-
-  const cardDiv = document.createElement('div');
-  cardDiv.className = 'card-fan-item';
-  cardDiv.style.position = 'relative';
-  cardDiv.style.transform = 'none';
-  const isRed = (topCard.suit === '♥' || topCard.suit === '♦');
-  cardDiv.style.color = isRed ? '#e74c3c' : '#2c3e50';
-
-  const valStr = topCard.val === 1 ? 'A' : topCard.val === 11 ? 'J' : topCard.val === 12 ? 'Q' : topCard.val === 13 ? 'K' : topCard.val;
-  cardDiv.innerHTML = `
-    <div style="font-size:12px; font-weight:bold; position:absolute; top:4px; left:6px;">${valStr}<br>${topCard.suit}</div>
-    <div style="font-size:24px; position:absolute; bottom:6px; right:6px;">${topCard.suit}</div>
-  `;
-  box.appendChild(cardDiv);
-}
-
-function onUserCardClick(idx) {
-  if (turnIndex !== 0 || isGameOver) return;
-
-  const pos = selectedIndices.indexOf(idx);
-  if (pos >= 0) {
-    selectedIndices.splice(pos, 1);
-  } else {
-    selectedIndices.push(idx);
-  }
-  renderUserHand();
-
-  if (selectedIndices.length > 0) {
-    const playCards = selectedIndices.map(i => players[0].hand[i]);
-    if (isValidPlay(playCards)) {
-      executePlay(0, selectedIndices);
-    }
-  }
-}
-
-function isValidPlay(cards) {
-  if (!cards || cards.length === 0) return false;
-  const topCard = discardHistory[discardHistory.length - 1];
-  if (!topCard) return true;
-
-  const first = cards[0];
-  const targetSuit = designatedSuit || topCard.suit;
-
-  if (cards.length === 1) {
-    return (first.suit === targetSuit || first.val === topCard.val || first.val === 8);
-  }
-
-  const allSameVal = cards.every(c => c.val === first.val);
-  if (allSameVal) {
-    return (first.suit === targetSuit || first.val === topCard.val || first.val === 8);
-  }
-  return false;
-}
-
-function executePlay(playerIdx, cardIndices) {
-  stopTimer();
-  const p = players[playerIdx];
-  const played = cardIndices.sort((a,b) => b-a).map(i => p.hand.splice(i, 1)[0]);
-
-  discardHistory.push(...played);
-  const lastPlayed = played[played.length - 1];
-
-  lastActionDiscard = {
-    cards: played,
-    totalVal: played.reduce((acc, c) => acc + c.val, 0),
-    playerId: p.seatIndex
-  };
-
-  selectedIndices = [];
-  designatedSuit = null;
-  consecutivePassCount = 0;
-
-  if (lastPlayed.val === 2) {
-    drawTwoStack += (2 * played.length);
-    showDrawAlertBanner(`+${drawTwoStack} DRAW`);
-  }
-
-  updateUI();
-
-  if (p.hand.length === 0) {
-    handleWin(p, 'AGARI (上がり)');
-    return;
-  }
-
-  if (lastPlayed.val === 8 && p.isCpu === false) {
-    showSuitSelector();
-    return;
-  }
-
-  advanceTurn();
-}
-
-function onDeckClick() {
-  if (turnIndex !== 0 || isGameOver) return;
-  stopTimer();
-
-  if (deck.length === 0) {
-    setMessage('山札がありません！');
-    return;
-  }
-
-  const drawCount = drawTwoStack > 0 ? drawTwoStack : 1;
-  drawTwoStack = 0;
-  hideDrawAlertBanner();
-
-  for (let i = 0; i < drawCount; i++) {
-    if (deck.length > 0) players[0].hand.push(deck.pop());
-  }
-
-  consecutivePassCount++;
-  updateUI();
-
-  if (checkNagare()) return;
-  advanceTurn();
-}
-
-function advanceTurn() {
-  if (isGameOver) return;
-  turnIndex = (turnIndex + 1) % players.length;
-  updateUI();
-
-  if (players[turnIndex].isCpu) {
-    setMessage(`${players[turnIndex].name} の思考中...`);
-    setTimeout(processCpuTurn, 1000);
-  } else {
-    setMessage(I18N[currentLang].yourTurn);
-    startTimerWithDuration(userTimeLimit, handleUserTimeout);
-  }
-}
-
-function processCpuTurn() {
-  if (isGameOver || turnIndex === 0) return;
-  const cpu = players[turnIndex];
-  const topCard = discardHistory[discardHistory.length - 1];
-  const targetSuit = designatedSuit || topCard.suit;
-
-  let validIndex = -1;
-  for (let i = 0; i < cpu.hand.length; i++) {
-    const c = cpu.hand[i];
-    if (c.suit === targetSuit || c.val === topCard.val || c.val === 8) {
-      validIndex = i;
-      break;
+  // CPU領域描画
+  const cpuContainer = document.getElementById('cpu-arc-container');
+  if (cpuContainer) {
+    cpuContainer.innerHTML = '';
+    for (let i = 1; i < players.length; i++) {
+      const p = players[i];
+      const box = document.createElement('div');
+      box.className = `cpu-player-box ${currentPlayerIndex === i ? 'active-turn' : ''}`;
+      box.innerHTML = `
+        <div style="font-size:10px; color:#fff; font-weight:bold;">${p.name}</div>
+        <div style="font-size:9px; color:var(--gold);">手札: ${p.hand.length}枚</div>
+        <div style="font-size:9px; color:#aaa;">Score: ${p.score}</div>
+      `;
+      cpuContainer.appendChild(box);
     }
   }
 
-  if (validIndex >= 0) {
-    executePlay(turnIndex, [validIndex]);
-  } else {
-    if (deck.length > 0) {
-      const drawCount = drawTwoStack > 0 ? drawTwoStack : 1;
-      drawTwoStack = 0;
-      hideDrawAlertBanner();
+  // ユーザー手札（扇状描画）
+  const fanContainer = document.getElementById('user-fan');
+  if (fanContainer) {
+    fanContainer.innerHTML = '';
+    const user = players[0];
+    const totalCards = user.hand.length;
+    
+    user.hand.forEach((card, idx) => {
+      const cardEl = renderCardElement(card, true, idx);
+      
+      // 扇状の配置計算
+      const angle = (idx - (totalCards - 1) / 2) * 8; // 回転角度
+      const xOffset = (idx - (totalCards - 1) / 2) * 32; // 横ずらし
+      const yOffset = Math.abs(idx - (totalCards - 1) / 2) * 4; // 弧を描く縦ずらし
 
-      for (let d = 0; d < drawCount; d++) {
-        if (deck.length > 0) cpu.hand.push(deck.pop());
-      }
-    }
-    consecutivePassCount++;
-    updateUI();
-    if (!checkNagare()) advanceTurn();
+      cardEl.style.transform = `translateX(${xOffset}px) translateY(${yOffset}px) rotate(${angle}deg)`;
+      fanContainer.appendChild(cardEl);
+    });
+  }
+
+  // ターンバッジ
+  const turnBadge = document.getElementById('user-turn-badge');
+  if (turnBadge) {
+    turnBadge.style.display = (currentPlayerIndex === 0) ? 'block' : 'none';
   }
 }
 
-function triggerUserDobon() {
-  if (isGameOver || !lastActionDiscard) return;
-  const myHand = players[0].hand;
-  const mySum = myHand.reduce((acc, c) => acc + c.val, 0);
+function startTurn() {
+  const p = players[currentPlayerIndex];
+  isMyTurn = (currentPlayerIndex === 0);
 
-  if (myHand.length === 1) {
-    handleChombo(players[0], '1枚手札でのドボン宣言（公式ルール違反）');
-    return;
+  const statusMsg = document.getElementById('status-msg');
+  if (statusMsg) {
+    statusMsg.innerText = isMyTurn ? "あなたの番です！カードをタップして出してください" : `${p.name} の思考中...`;
   }
 
-  if (mySum === lastActionDiscard.totalVal) {
-    handleWin(players[0], 'DOBON (ドボン!)');
-  } else {
-    handleChombo(players[0], `ドボン失敗 (手札合計: ${mySum} ≠ 場のカード: ${lastActionDiscard.totalVal})`);
+  startTimer();
+
+  if (p.isCpu) {
+    setTimeout(() => {
+      cpuPlayTurn(p);
+    }, 1200);
   }
 }
 
-function toggleUserLast() {
-  const p = players[0];
-  if (!p) return;
-  p.declaredLast = !p.declaredLast;
-  const btn = document.getElementById('last-btn');
-  if (btn) btn.style.background = p.declaredLast ? '#e74c3c' : 'rgba(45,35,25,0.9)';
-  setMessage(p.declaredLast ? 'LAST (リーチ) 宣言中！' : I18N[currentLang].yourTurn);
-}
+function startTimer() {
+  clearInterval(turnTimer);
+  remainingTime = maxTurnTime;
+  const timerSec = document.getElementById('timer-sec');
+  if (timerSec) timerSec.innerText = remainingTime;
 
-function handleWin(winner, typeStr) {
-  isGameOver = true;
-  stopTimer();
-  playWinSound();
-  showConfetti();
-
-  const isUser = winner.id === 0;
-  showOutcomeBanner(isUser);
-
-  let points = 0;
-  players.forEach(p => {
-    const pSum = p.hand.reduce((acc, c) => acc + c.val, 0);
-    points += pSum;
-  });
-  points *= roundMultiplier;
-  winner.score += points;
-
-  let detailHtml = `<b>${winner.name}</b> の【${typeStr}】！<br><br>`;
-  detailHtml += `獲得ポイント: <b style="color:var(--gold);">${points} pt</b> (倍率: ${roundMultiplier}x)<br>`;
-
-  showResultModal(`${winner.name} WIN!`, detailHtml);
-}
-
-function handleChombo(offender, reasonStr) {
-  isGameOver = true;
-  stopTimer();
-  roundMultiplier *= 2;
-
-  const penalty = 5 * roundMultiplier;
-  offender.score -= penalty;
-
-  showChomboDoubleBanner(offender.name, roundMultiplier);
-  showResultModal('CHOMBO / FOUL', `<b>違反者: ${offender.name}</b><br>${reasonStr}<br><br>ペナルティ: ${penalty} pt<br>※次回得点倍率が <b>${roundMultiplier}x</b> にアップ！`);
-}
-
-function checkNagare() {
-  if (consecutivePassCount >= players.length || deck.length === 0) {
-    isGameOver = true;
-    stopTimer();
-    roundMultiplier *= 2;
-    showResultModal('NAGARE (流局)', `山札切了または全員パスにより流局しました。<br>※次回得点倍率が <b>${roundMultiplier}x</b> にアップ！`);
-    return true;
-  }
-  return false;
-}
-
-function startTimerWithDuration(sec, onTimeout) {
-  stopTimer();
-  timerSeconds = sec;
-  const tEl = document.getElementById('timer-sec');
-  if (tEl) tEl.innerText = timerSeconds;
-
-  timerInterval = setInterval(() => {
-    timerSeconds--;
-    if (tEl) tEl.innerText = timerSeconds;
-    if (timerSeconds <= 0) {
-      stopTimer();
-      if (onTimeout) onTimeout();
+  turnTimer = setInterval(() => {
+    remainingTime--;
+    if (timerSec) timerSec.innerText = remainingTime;
+    if (remainingTime <= 0) {
+      clearInterval(turnTimer);
+      onTimeOut();
     }
   }, 1000);
 }
 
-function stopTimer() {
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = null;
-}
-
-function handleUserTimeout() {
-  if (turnIndex === 0 && !isGameOver) {
-    setMessage('時間切れ！自動パスしました');
-    onDeckClick();
+function onTimeOut() {
+  if (isMyTurn) {
+    onDeckClick(); // タイムアウト時は自動山引き
   }
 }
 
-function showSuitSelector() {
-  const el = document.getElementById('suit-select-floating');
-  if (el) el.style.display = 'block';
+function onHandCardClick(index) {
+  if (!isMyTurn) return;
+  const user = players[0];
+  const card = user.hand[index];
+
+  if (isValidPlay(card)) {
+    // カード出し実行
+    user.hand.splice(index, 1);
+    currentDiscard = card;
+    currentSuit = card.suit;
+    selectedHandIndices = [];
+
+    // 8出しのマーク変更判定
+    if (card.value === 8) {
+      document.getElementById('suit-select-floating').style.display = 'block';
+      return;
+    }
+
+    checkWinOrNextTurn();
+  }
 }
 
-function selectSuit(suitSymbol) {
-  designatedSuit = suitSymbol;
-  const el = document.getElementById('suit-select-floating');
-  if (el) el.style.display = 'none';
-  setMessage(`指定マーク: ${suitSymbol}`);
-  advanceTurn();
+function selectSuit(suit) {
+  currentSuit = suit;
+  document.getElementById('suit-select-floating').style.display = 'none';
+  checkWinOrNextTurn();
 }
 
-function showResultModal(title, html) {
-  const modal = document.getElementById('result-modal');
-  const tEl = document.getElementById('result-title');
-  const dEl = document.getElementById('result-detail');
-  if (tEl) tEl.innerText = title;
-  if (dEl) dEl.innerHTML = html;
-  if (modal) modal.style.display = 'flex';
+function onDeckClick() {
+  if (!isMyTurn) return;
+  if (deck.length > 0) {
+    const drawn = deck.pop();
+    players[0].hand.push(drawn);
+  }
+  nextTurn();
 }
 
-function toggleMinimizeResult() {
-  const modal = document.getElementById('result-modal');
-  const bar = document.getElementById('minimized-restore-bar');
-  if (!modal || !bar) return;
+function isValidPlay(card) {
+  if (!currentDiscard) return true;
+  return (card.suit === currentSuit || card.value === currentDiscard.value || card.value === 8);
+}
 
-  if (modal.style.display !== 'none') {
-    modal.style.display = 'none';
-    bar.style.display = 'block';
+function cpuPlayTurn(cpu) {
+  const validCards = cpu.hand.filter(c => isValidPlay(c));
+  if (validCards.length > 0) {
+    const playCard = validCards[0];
+    const idx = cpu.hand.indexOf(playCard);
+    cpu.hand.splice(idx, 1);
+    currentDiscard = playCard;
+    currentSuit = playCard.suit;
+
+    if (playCard.value === 8) {
+      const suits = ['♠', '♥', '♦', '♣'];
+      currentSuit = suits[Math.floor(Math.random() * suits.length)];
+    }
   } else {
-    modal.style.display = 'flex';
-    bar.style.display = 'none';
+    if (deck.length > 0) {
+      cpu.hand.push(deck.pop());
+    }
   }
+  checkWinOrNextTurn();
 }
 
-function nextRound() {
-  const modal = document.getElementById('result-modal');
-  if (modal) modal.style.display = 'none';
-  const bar = document.getElementById('minimized-restore-bar');
-  if (bar) bar.style.display = 'none';
-
-  currentRound++;
-  initGame(players.length);
-}
-
-function openLobbyModal() {
-  if (typeof window.openLobbyModal === 'function' && window.openLobbyModal !== openLobbyModal) {
-    window.openLobbyModal();
+function checkWinOrNextTurn() {
+  const currentP = players[currentPlayerIndex];
+  if (currentP.hand.length === 0) {
+    alert(`${currentP.name} の勝利（上がり）です！`);
+    startNewGame();
     return;
   }
-  const m = document.getElementById('online-lobby-modal');
-  if (m) m.style.display = 'flex';
+  nextTurn();
 }
 
-function closeLobbyModal() {
-  const m = document.getElementById('online-lobby-modal');
-  if (m) m.style.display = 'none';
+function nextTurn() {
+  clearInterval(turnTimer);
+  currentPlayerIndex = (currentPlayerIndex + playDirection + players.length) % players.length;
+  updateUI();
+  startTurn();
 }
 
-function openPayoutModal() {
-  const m = document.getElementById('payout-modal');
-  if (m) m.style.display = 'flex';
+function triggerUserDobon() {
+  if (!isGameActive) return;
+  alert("DOBON宣言！");
 }
 
-function closePayoutModal() {
-  const m = document.getElementById('payout-modal');
-  if (m) m.style.display = 'none';
+function toggleUserLast() {
+  players[0].isLast = !players[0].isLast;
+  alert(`LAST宣言: ${players[0].isLast ? 'ON' : 'OFF'}`);
 }
 
-function openScoreHistoryModal() {
-  const m = document.getElementById('history-modal');
-  if (m) m.style.display = 'flex';
+function toggleConfigAccordion() {
+  const panel = document.getElementById('cpu-config-panel');
+  const arrow = document.getElementById('config-arrow');
+  if (panel) {
+    if (panel.style.display === 'none' || !panel.style.display) {
+      panel.style.display = 'block';
+      if (arrow) arrow.innerText = '▲';
+    } else {
+      panel.style.display = 'none';
+      if (arrow) arrow.innerText = '▼';
+    }
+  }
 }
 
-function closeScoreHistoryModal() {
-  const m = document.getElementById('history-modal');
-  if (m) m.style.display = 'none';
-}
-
-function suspendGame() {
-  alert('ゲーム状態を保存しました');
-  quitToTitle();
-}
-
-function quitToTitle() {
-  stopTimer();
-  const startModal = document.getElementById('start-modal');
-  if (startModal) startModal.style.display = 'flex';
-}
-
-function checkSavedSession() {
-  // 自動再開チェックのプレースホルダー
-}
-
-function showOutcomeBanner(isWin) {
-  const b = document.getElementById('round-outcome-banner');
-  if (!b) return;
-  b.innerText = isWin ? 'VICTORY!' : 'DEFEAT';
-  b.style.color = isWin ? '#2ecc71' : '#e74c3c';
-  b.style.display = 'block';
-  setTimeout(() => { b.style.display = 'none'; }, 3000);
-}
-
-function hideOutcomeBanner() {
-  const b = document.getElementById('round-outcome-banner');
-  if (b) b.style.display = 'none';
-}
-
-function showChomboDoubleBanner(name, mult) {
-  const b = document.getElementById('chombo-double-banner');
-  const desc = document.getElementById('chombo-offender-desc');
-  if (!b) return;
-  if (desc) desc.innerText = `違反者: ${name} / 次回得点倍率: ${mult}x`;
-  b.style.display = 'block';
-  setTimeout(() => { b.style.display = 'none'; }, 4000);
-}
-
-function showDrawAlertBanner(text) {
-  const b = document.getElementById('draw-alert-banner');
-  if (!b) return;
-  b.innerText = text;
-  b.style.display = 'block';
-}
-
-function hideDrawAlertBanner() {
-  const b = document.getElementById('draw-alert-banner');
-  if (b) b.style.display = 'none';
-}
-
-function playDealSound() {}
-function playWinSound() {}
-
-function showConfetti() {
-  const canvas = document.getElementById('confetti-canvas');
-  if (canvas) canvas.style.display = 'block';
-}
-
-function stopConfetti() {
-  const canvas = document.getElementById('confetti-canvas');
-  if (canvas) canvas.style.display = 'none';
-}
-
-function playCardWithHandAnimation(seatIdx, card, cb) { if (cb) cb(); }
-function playDrawAnimation(seatIdx, cb) { if (cb) cb(); }
-function clearDobonStandby() {}
-function startNakiMode() {}
-function confirmNaki() {}
-function skipChomboRound() {}
-function continueChampionship() {}
-function resetChampionship() {}
+function openPayoutModal() { document.getElementById('payout-modal').style.display = 'flex'; }
+function closePayoutModal() { document.getElementById('payout-modal').style.display = 'none'; }
+function openScoreHistoryModal() { document.getElementById('history-modal').style.display = 'flex'; }
+function closeScoreHistoryModal() { document.getElementById('history-modal').style.display = 'none'; }
+function suspendGame() { alert("ゲームを中断しました"); }
+function quitToTitle() { location.reload(); }

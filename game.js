@@ -1559,7 +1559,7 @@ function toggleMinimizeResult() {
   else { m.style.display = 'none'; b.style.display = 'block'; }
 }
 
-function nextRound() {
+function requestNextRound() {
   stopConfetti();
   hideOutcomeBanner();
   const rm = document.getElementById('result-modal'); if (rm) rm.style.display = 'none';

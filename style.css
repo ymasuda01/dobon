@@ -1,8 +1,8 @@
 /**
  * DOBON MASTER - Las Vegas VIP Lounge Stylesheet
- * Game Version: 2026.00.005
- * File Version: style.css v0.1.4
- * Update: Expanded Deck Click Hitbox, Full Card Size Hit Area.
+ * Game Version: 2026.00.006
+ * File Version: style.css v0.1.5
+ * Updates: Enhanced Deck Hitbox, Extended Touch Area with pseudo-element.
  */
 
 :root {
@@ -435,7 +435,7 @@ header {
   z-index: 25;
 }
 
-/* 【修正】山札：カードサイズ全体（100%）をタップ判定にし、確実に感知 */
+/* 【山札タッチ判定の完全拡張】カードサイズ全域＋周囲12pxまで広げてタップ判定を確実に感知 */
 .deck-3d-stack {
   position: relative;
   width: clamp(75px, 12vw, 92px);
@@ -444,8 +444,19 @@ header {
   pointer-events: auto;
   z-index: 35;
 }
+/* タッチエリア拡張用疑似要素 */
+.deck-3d-stack::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: -12px;
+  right: -12px;
+  bottom: -12px;
+  z-index: 50;
+  cursor: pointer;
+}
 .deck-3d-stack * {
-  pointer-events: none; /* 子要素のレイヤーがクリックを邪魔しないようにする */
+  pointer-events: none; /* 子要素のレイヤーがクリックを遮断しないようにする */
 }
 .deck-3d-stack .layer {
   position: absolute;

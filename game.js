@@ -1,12 +1,13 @@
 /**
  * DOBON MASTER - Core Game Engine
- * Game Version: 2026.00.005
- * File Version: game.js v0.2.0
- * Features: Rendering, Local Rules, Bicycle Pips, Manual Dobon, Hand Fan, Sound
+ * Game Version: 2026.00.006
+ * File Version: game.js v0.2.1
+ * Updates: Animation-First Turn Transition, Unified Next Round Handler,
+ *          Bicycle Real Pips, Manual Dobon, Hand Fan & Audio Engine.
  */
 
-const GAME_VERSION = "2026.00.005";
-const FILE_VERSION = "game.js v0.2.0";
+const GAME_VERSION = "2026.00.006";
+const FILE_VERSION = "game.js v0.2.1";
 console.log(`[DOBON Core Loaded] Game: ${GAME_VERSION} | File: ${FILE_VERSION}`);
 
 const I18N = {
@@ -184,8 +185,7 @@ function startConfetti() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     pieces.forEach(p => {
       p.vx *= p.drag; p.vy *= p.drag; p.vy += p.gravity;
-      p.x += p.vx; p.y += p.vy;
-      p.rotation += p.rotSpeed;
+      p.x += p.vx; p.y += p.vy; p.rotation += p.rotSpeed;
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate((p.angle * Math.PI) / 180);
       ctx.fillStyle = p.color; ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
       ctx.restore();
@@ -259,9 +259,6 @@ function quitToTitle() {
   }
 }
 
-// ==========================================
-// 初期化イベント
-// ==========================================
 window.addEventListener('DOMContentLoaded', () => {
   try {
     const savedHistory = localStorage.getItem('dobon_permanent_history');
@@ -358,7 +355,9 @@ function startRound() {
   isGameOver = false; stopTimer(); clearDobonStandby(); stopConfetti();
   hideOutcomeBanner();
   createDeck52(); discardHistory = []; drawTwoStack = 0; designatedSuit = null;
-  direction = -1; selectedIndices = []; cancelNakiMode(); pendingLastCheck = false;
+  // ルールブック準拠：初期方向は反時計回り（-1）
+  direction = -1;
+  selectedIndices = []; cancelNakiMode(); pendingLastCheck = false;
   consecutivePassCount = 0;
   hideDrawAlertBanner();
 
@@ -592,7 +591,7 @@ function updateUI() {
     }
   }
 
-  // ドボンボタン判定（★自分が出したカードは除外★）
+  // ドボンボタン判定（自分が出したカードは除外）
   const user = players[0];
   const mySum = (user && !isSpec) ? user.hand.reduce((s, c) => s + (c ? c.val : 0), 0) : 0;
   const targetVal = lastActionDiscard ? lastActionDiscard.totalVal : null;
@@ -614,7 +613,6 @@ function updateUI() {
       } else {
         dobonBtn.innerText = 'DOBON';
         dobonBtn.classList.remove('gaeshi-mode');
-        // 自分が出したカードには絶対に光らせない！
         if (!isGameOver && targetVal !== null && !isMyOwnDiscard && mySum === targetVal && user && user.hand.length >= 2 && !user.bannedFromWin) {
           dobonBtn.classList.add('ready');
         } else {
@@ -641,7 +639,7 @@ function updateUI() {
   const userSumEl = document.getElementById('user-sum');
   if (userSumEl) userSumEl.innerText = mySum;
 
-  // 手札展開
+  // 手札展開（2段化対応）
   const userFanBox = document.getElementById('user-fan');
   if (userFanBox) {
     userFanBox.innerHTML = '';
@@ -856,6 +854,7 @@ function playUserCard(index) {
       }
     }
 
+    // ★アニメーション完了後に手番移行・送信を行う★
     playCardWithHandAnimation(0, card, () => {
       players[0].hand.splice(index, 1);
       discardHistory.push(card);
@@ -869,7 +868,7 @@ function playUserCard(index) {
         return;
       }
 
-      if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && socket && currentRoomId) {
+      if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
         socket.emit('play_card', {
           roomId: currentRoomId,
           card: card,
@@ -892,7 +891,7 @@ function selectSuit(suit) {
   if (sf) sf.style.display = 'none';
   setMessage(I18N[currentLang].suitChanged.replace('{suit}', suit));
 
-  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && socket && currentRoomId) {
+  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
     socket.emit('play_card', {
       roomId: currentRoomId,
       card: { val: 8, label: '8', suit: suit, color: (suit === '♥' || suit === '♦') ? 'red' : 'black' },
@@ -911,7 +910,6 @@ function postCardPlayEffect(card, player) {
     if (player.bannedFromWin) {
       commitChombo(player, 'Attempted to win while win-banned'); return;
     }
-    // オフライン（一人プレイ）のみローカルで通常勝利発動。オンラインはサーバーからの合図を待つ！
     if (typeof isOnlineMatch === 'undefined' || !isOnlineMatch) {
       endRoundNormalWin(player);
     }
@@ -986,7 +984,7 @@ function onDeckClick() {
   pendingLastCheck = false;
 
   playDrawAnimation(0, () => {
-    if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && socket && currentRoomId) {
+    if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
       socket.emit('draw_card', { roomId: currentRoomId, count: drawTwoStack > 0 ? drawTwoStack : 1 });
       return;
     }
@@ -1061,7 +1059,7 @@ function startNakiMode(type) {
 
   triggerFlash();
 
-  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && socket && currentRoomId) {
+  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
     socket.emit('pause_for_naki', { roomId: currentRoomId, nakiType: type === 2 ? 'PON' : 'KAN' });
   }
 
@@ -1085,7 +1083,7 @@ function cancelNakiMode() {
   if (kBtn) kBtn.classList.remove('active');
   if (cBtn) cBtn.style.display = 'none';
 
-  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && socket && currentRoomId) {
+  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
     socket.emit('resume_from_naki', { roomId: currentRoomId });
   }
 
@@ -1132,7 +1130,7 @@ function confirmNaki() {
     isPon: isPon, isKan: isKan, baseVal: val
   };
 
-  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && socket && currentRoomId) {
+  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
     socket.emit('resume_from_naki', { roomId: currentRoomId });
   }
 
@@ -1180,7 +1178,7 @@ function executePonDobonWin(winner, discardCard, isKan, baseVal) {
   roundMultiplier = 1; nextRoundStarter = winner.id;
   updateUI();
 
-  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && socket && currentRoomId) {
+  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
     socket.emit('dobon_declared_sync', {
       roomId: currentRoomId,
       winnerSeatIndex: winner.seatIndex !== undefined ? winner.seatIndex : winner.id,
@@ -1227,3 +1225,513 @@ function triggerUserDobon() {
     const mySum = user.hand.reduce((s, c) => s + (c ? c.val : 0), 0);
 
     if (mySum === targetVal) {
+      speakVoice(currentLang === 'ja' ? 'ドボン返し！' : 'Counter Dobon!');
+      clearDobonStandby();
+      executeDobonGaeshiWin(user, pendingDobonData.winner);
+      return;
+    } else {
+      commitChombo(user, `手札合計(${mySum})が一致していません（誤ドボン返し）`);
+      return;
+    }
+  }
+
+  speakVoice(currentLang === 'ja' ? 'ドボン！' : 'Dobon!');
+
+  if (user.bannedFromWin) {
+    commitChombo(user, 'Attempted Dobon while win-banned'); return;
+  }
+
+  const mySum = user.hand.reduce((s, c) => s + (c ? c.val : 0), 0);
+  const targetVal = lastActionDiscard ? lastActionDiscard.totalVal : null;
+
+  if (targetVal !== null && mySum === targetVal && user.hand.length >= 2) {
+    stopTimer();
+    const loser = players[lastActionDiscard.playerId] || players[(user.id - direction + numPlayers) % numPlayers];
+    startDobonStandby(user, loser, lastActionDiscard);
+  } else {
+    commitChombo(user, `Hand sum (${mySum}) does not match discard (${targetVal})`);
+  }
+}
+
+function startDobonStandby(winner, loser, actionDiscard) {
+  stopTimer();
+  pendingDobonData = { winner, loser, actionDiscard };
+  dobonStandbySec = 10;
+
+  const banner = document.getElementById('dobon-gaeshi-banner');
+  const countEl = document.getElementById('gaeshi-countdown');
+  if (banner) banner.style.display = 'block';
+  if (countEl) countEl.innerText = `${dobonStandbySec}`;
+
+  updateUI();
+
+  if ((typeof isOnlineMatch === 'undefined' || !isOnlineMatch) && loser.id !== 0 && loser.hand.length >= 2) {
+    const lSum = loser.hand.reduce((s, c) => s + (c ? c.val : 0), 0);
+    if (lSum === actionDiscard.totalVal && !loser.bannedFromWin) {
+      setTimeout(() => {
+        if (pendingDobonData) {
+          speakVoice(currentLang === 'ja' ? 'ドボン返し！' : 'Counter Dobon!');
+          clearDobonStandby();
+          executeDobonGaeshiWin(loser, winner);
+        }
+      }, 3500);
+    }
+  }
+
+  dobonStandbyTimer = setInterval(() => {
+    dobonStandbySec--;
+    if (countEl) countEl.innerText = `${dobonStandbySec}`;
+    if (dobonStandbySec <= 0) {
+      clearDobonStandby();
+      finalizeNormalDobon(pendingDobonData.winner, pendingDobonData.loser, pendingDobonData.actionDiscard);
+    }
+  }, 1000);
+}
+
+function clearDobonStandby() {
+  if (dobonStandbyTimer) { clearInterval(dobonStandbyTimer); dobonStandbyTimer = null; }
+  const banner = document.getElementById('dobon-gaeshi-banner');
+  if (banner) banner.style.display = 'none';
+  const seats = document.querySelectorAll('.cpu-seat');
+  seats.forEach(s => s.classList.remove('dobon-attacker'));
+}
+
+function finalizeNormalDobon(winner, loser, actionDiscard) {
+  isGameOver = true;
+  hideDrawAlertBanner();
+
+  if (actionDiscard.cards) {
+    actionDiscard.cards.forEach(c => loser.hand.push(c));
+  }
+
+  let points = 0;
+  const loserCount = calculateSpecialHandCount(loser.hand);
+
+  if (actionDiscard.cards.length === 1 && actionDiscard.cards[0].val === 2 && winner.hand.length === 2 && winner.hand.every(c => c && c.val === 1)) points = 20 * roundMultiplier;
+  else if (actionDiscard.isPon && actionDiscard.baseVal === 2) points = 80 * roundMultiplier;
+  else if (actionDiscard.isKan && actionDiscard.baseVal === 2) points = 160 * roundMultiplier;
+  else if (loser.hand.length === actionDiscard.cards.length) points = 20 * roundMultiplier;
+  else if (actionDiscard.isPon) points = 4 * loserCount * roundMultiplier;
+  else if (actionDiscard.isKan) points = 8 * loserCount * roundMultiplier;
+  else points = 2 * loserCount * roundMultiplier;
+
+  const deltas = players.map(p => (p.id === winner.id ? points : (p.id === loser.id ? -points : 0)));
+  winner.score += points; loser.score -= points;
+
+  recordRoundHistory('DOBON', deltas);
+  roundMultiplier = 1; nextRoundStarter = winner.id;
+  updateUI();
+
+  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
+    socket.emit('dobon_declared_sync', {
+      roomId: currentRoomId,
+      winnerSeatIndex: winner.seatIndex !== undefined ? winner.seatIndex : winner.id,
+      loserSeatIndex: loser.seatIndex !== undefined ? loser.seatIndex : loser.id,
+      winType: 'DOBON',
+      points: points,
+      loserHandCount: loserCount
+    });
+  }
+
+  showOutcomeBanner(winner.id === 0);
+  showResultModal(`${winner.name} DOBON WIN!`, `<b>${winner.name}</b> の【DOBON】！<br><br>勝者: <b>${winner.name} (+${points}pt)</b><br>放銃者: <b style="color:#e74c3c;">${loser.name} (-${points}pt)</b><br>(${loser.name} 手札換算: ${loserCount}枚)<br><br>※他プレイヤーは点数変動なし`);
+  pendingDobonData = null;
+}
+
+function executeDobonGaeshiWin(winner, loser) {
+  isGameOver = true;
+  hideDrawAlertBanner();
+  const points = 20 * roundMultiplier;
+
+  const deltas = players.map(p => (p.id === winner.id ? points : (p.id === loser.id ? -points : 0)));
+  winner.score += points; loser.score -= points;
+
+  recordRoundHistory('DOBON-GAESHI', deltas);
+  roundMultiplier = 1; nextRoundStarter = winner.id;
+  updateUI();
+
+  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
+    socket.emit('dobon_declared_sync', {
+      roomId: currentRoomId,
+      winnerSeatIndex: winner.seatIndex !== undefined ? winner.seatIndex : winner.id,
+      loserSeatIndex: loser.seatIndex !== undefined ? loser.seatIndex : loser.id,
+      winType: 'DOBON-GAESHI',
+      points: points,
+      loserHandCount: null
+    });
+  }
+
+  showOutcomeBanner(winner.id === 0);
+  showResultModal(`DOBON-GAESHI! (カウンター成立)`, `<b>${winner.name}</b> の【DOBON-GAESHI】！<br><br>勝者: <b>${winner.name} (+${points}pt)</b><br>放銃者: <b style="color:#e74c3c;">${loser.name} (-${points}pt)</b><br><br>※他プレイヤーは点数変動なし`);
+  pendingDobonData = null;
+}
+
+function calculateSpecialHandCount(hand) {
+  let count = 0, eightMult = 1;
+  hand.forEach(c => {
+    if (!c) { count += 1; return; }
+    if (c.val === 2) count += 2;
+    else count += 1;
+    if (c.val === 8) eightMult *= 2;
+  });
+  return (count + drawTwoStack) * eightMult;
+}
+
+function endRoundNormalWin(winner) {
+  isGameOver = true; stopTimer(); clearDobonStandby(); hideDrawAlertBanner();
+  let totalWin = 0;
+  const deltas = new Array(players.length).fill(0);
+  let detailHtml = `<b>${winner.name} NORMAL WIN!</b><br><br>`;
+
+  players.forEach(p => {
+    if (p.id !== winner.id) {
+      const c = calculateSpecialHandCount(p.hand);
+      const lost = c * 1 * roundMultiplier;
+      p.score -= lost; deltas[p.id] = -lost; totalWin += lost;
+      detailHtml += `${p.name}: ${c} cards (-${lost}pt)<br>`;
+    }
+  });
+
+  winner.score += totalWin; deltas[winner.id] = totalWin;
+  recordRoundHistory('NORMAL WIN', deltas);
+  roundMultiplier = 1; nextRoundStarter = winner.id;
+  updateUI();
+
+  showOutcomeBanner(winner.id === 0);
+  showResultModal(`${winner.name} WIN!`, `${detailHtml}<b>Winner: +${totalWin}pt</b>`);
+}
+
+function commitChombo(offender, reason) {
+  isGameOver = true; stopTimer(); clearDobonStandby(); hideDrawAlertBanner();
+  speakVoice(currentLang === 'ja' ? 'チョンボ！' : 'Chombo!');
+
+  const penalty = 5 * roundMultiplier;
+  let totalFine = 0;
+  const deltas = new Array(players.length).fill(0);
+
+  players.forEach(p => {
+    if (p.id !== offender.id) {
+      p.score += penalty; deltas[p.id] = penalty; totalFine += penalty;
+    }
+  });
+  offender.score -= totalFine; deltas[offender.id] = -totalFine;
+  recordRoundHistory('CHOMBO', deltas);
+
+  offender.bannedFromWin = true;
+  if (players.every(p => p.bannedFromWin)) players.forEach(p => p.bannedFromWin = false);
+  roundMultiplier *= 2;
+  nextRoundStarter = offender.id;
+  drawTwoStack = 0;
+  const ds = document.getElementById('draw-stack');
+  if (ds) ds.innerText = '0';
+  const md = document.getElementById('multiplier-display');
+  if (md) md.innerText = roundMultiplier + 'x';
+  updateUI();
+
+  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
+    socket.emit('chombo_occurred', {
+      roomId: currentRoomId,
+      offenderSeatIndex: offender.seatIndex !== undefined ? offender.seatIndex : 0,
+      reason: reason
+    });
+  }
+
+  showChomboDoubleBanner(offender.name, roundMultiplier);
+  showResultModal('CHOMBO / FOUL', `<b>違反者: ${offender.name} (-${totalFine}pt)</b><br>${reason}<br><br><span style="color:#ff6b81; font-weight:bold;">※勝者なし・全員に点数支払い ＆ 次回得点倍率は ${roundMultiplier}x に倍々累積！</span>`);
+}
+
+function checkTenho() {
+  const targetVal = discardHistory[0].val;
+  for (let p of players) {
+    if (p.bannedFromWin) continue;
+    if (p.hand.reduce((s, c) => s + (c ? c.val : 0), 0) === targetVal) {
+      isGameOver = true; stopTimer(); hideDrawAlertBanner();
+      const pts = 20 * roundMultiplier;
+      const deltas = new Array(players.length).fill(0);
+      players.forEach(o => {
+        if (o.id !== p.id) { o.score -= pts; deltas[o.id] = -pts; }
+      });
+      const winPts = pts * (players.length - 1);
+      p.score += winPts; deltas[p.id] = winPts;
+      recordRoundHistory('TENHO', deltas);
+      nextRoundStarter = p.id;
+      updateUI();
+      showOutcomeBanner(p.id === 0);
+      showResultModal('TENHO DOBON!', `<b>${p.name}: +${winPts}pt</b>`);
+      return;
+    }
+  }
+}
+
+function cpuTurn() {
+  if (isGameOver || turnIndex === 0 || pendingDobonData || (typeof isOnlineMatch !== 'undefined' && isOnlineMatch)) return;
+  const cpu = players[turnIndex];
+  const top = discardHistory[discardHistory.length - 1];
+
+  if (pendingLastCheck && !players[0].declaredLast) {
+    pendingLastCheck = false;
+    commitChombo(players[0], I18N[currentLang].chomboMissLast);
+    return;
+  }
+  pendingLastCheck = false;
+
+  if (cpu.hand.length <= 2 && !cpu.declaredLast) cpu.declaredLast = true;
+
+  if (drawTwoStack > 0) {
+    const idx2 = cpu.hand.findIndex(c => c && c.val === 2);
+    if (idx2 > -1) {
+      const pl = cpu.hand[idx2];
+      playCardWithHandAnimation(cpu.id, pl, () => {
+        cpu.hand.splice(idx2, 1);
+        discardHistory.push(pl);
+        lastActionDiscard = { cards: [pl], totalVal: 2, playerId: cpu.id };
+        consecutivePassCount = 0;
+        postCardPlayEffect(pl, cpu);
+      });
+      return;
+    } else {
+      let dCount = drawTwoStack;
+      drawTwoStack = 0;
+      hideDrawAlertBanner();
+      const drawStep = () => {
+        if (dCount > 0) {
+          dCount--;
+          playDrawAnimation(cpu.id, () => {
+            drawCard(cpu);
+            drawStep();
+          });
+        } else {
+          updateUI();
+          consecutivePassCount++;
+          checkNagare();
+          passTurn(0);
+        }
+      };
+      drawStep();
+      return;
+    }
+  }
+
+  const playable = [];
+  cpu.hand.forEach((c, idx) => {
+    if (!c) return;
+    const mSuit = designatedSuit ? (c.suit === designatedSuit) : (c.suit === top.suit);
+    const mNum = (c.label === top.label);
+    if (mSuit || mNum || c.val === 8) {
+      if (cpu.hand.length === 1 && c.val === 8 && !mSuit && !mNum) return;
+      playable.push(idx);
+    }
+  });
+
+  if (playable.length > 0) {
+    const pIdx = playable[Math.floor(Math.random() * playable.length)];
+    const pl = cpu.hand[pIdx];
+
+    playCardWithHandAnimation(cpu.id, pl, () => {
+      cpu.hand.splice(pIdx, 1);
+      discardHistory.push(pl);
+      lastActionDiscard = { cards: [pl], totalVal: pl.val, playerId: cpu.id };
+      designatedSuit = null;
+      consecutivePassCount = 0;
+
+      if (pl.val === 8) {
+        const counts = {};
+        cpu.hand.forEach(c => { if (c) counts[c.suit] = (counts[c.suit] || 0) + 1; });
+        designatedSuit = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || '♠';
+      }
+      postCardPlayEffect(pl, cpu);
+    });
+  } else {
+    playDrawAnimation(cpu.id, () => {
+      drawCard(cpu);
+      if (cpu.declaredLast) cpu.declaredLast = false;
+      consecutivePassCount++;
+      checkNagare();
+      updateUI(); passTurn(0);
+    });
+  }
+}
+
+function checkCpuInterrupts(targetVal, playedPlayerId) {
+  if (isGameOver || pendingDobonData || (typeof isOnlineMatch !== 'undefined' && isOnlineMatch)) return false;
+
+  for (let p of players) {
+    if (p.id === 0 || p.id === playedPlayerId || p.bannedFromWin || p.hand.length < 2) continue;
+
+    if (p.hand.reduce((s, c) => s + (c ? c.val : 0), 0) === targetVal) {
+      setTimeout(() => {
+        if (!isGameOver && !pendingDobonData) {
+          speakVoice(currentLang === 'ja' ? 'ドボン！' : 'Dobon!');
+          const loser = players[playedPlayerId];
+          startDobonStandby(p, loser, lastActionDiscard);
+        }
+      }, 500);
+      return true;
+    }
+  }
+  return false;
+}
+
+// ==========================================
+// 履歴管理（セッション独立計上）
+// ==========================================
+function getNextSessionNumber() {
+  if (setScoreHistory.length === 0) return 1;
+  return Math.max(...setScoreHistory.map(s => s.set)) + 1;
+}
+
+function recordRoundHistory(type, deltas) {
+  if (currentRound === 1 && (!setScoreHistory.length || setScoreHistory[setScoreHistory.length - 1].rounds.length > 0)) {
+    currentSet = getNextSessionNumber();
+  }
+
+  let setObj = setScoreHistory.find(s => s.set === currentSet);
+  if (!setObj) {
+    setObj = { set: currentSet, rounds: [] };
+    setScoreHistory.push(setObj);
+  }
+
+  setObj.rounds.push({
+    round: currentRound, type, deltas: [...deltas],
+    scoresAfter: players.map(p => p.score)
+  });
+  localStorage.setItem('dobon_permanent_history', JSON.stringify(setScoreHistory));
+}
+
+function openScoreHistoryModal() {
+  const container = document.getElementById('accordion-history-container');
+  if (!container) return;
+  if (setScoreHistory.length === 0) {
+    container.innerHTML = '<div style="font-size:11px; color:#888; text-align:center; padding:15px;">対戦履歴はありません。</div>';
+  } else {
+    let html = '';
+    setScoreHistory.forEach((sObj, sIdx) => {
+      const totals = new Array(players.length).fill(0);
+      sObj.rounds.forEach(r => r.deltas.forEach((d, pIdx) => totals[pIdx] += d));
+      const champIdx = totals.indexOf(Math.max(...totals));
+      const champName = players[champIdx] ? players[champIdx].name : `P${champIdx}`;
+
+      html += `
+        <div class="accordion-item" id="acc-item-${sIdx}">
+          <div class="accordion-header" onclick="toggleAccordion(${sIdx})">
+            <span>SESSION ${sObj.set} (計${sObj.rounds.length}回) | 🏆 ${champName}</span>
+            <span id="acc-arrow-${sIdx}">▼</span>
+          </div>
+          <div class="accordion-content">
+            <div style="font-size:10px; margin-bottom:5px; color:var(--gold);">Total: ${players.map((p, i) => `${p.name}: ${totals[i]}pt`).join(' | ')}</div>
+            <table class="history-table">
+              <thead><tr><th>R</th><th>TYPE</th>${players.map(p => `<th>${p.name}</th>`).join('')}</tr></thead>
+              <tbody>
+                ${sObj.rounds.map(r => `
+                  <tr>
+                    <td>${r.round}</td><td>${r.type}</td>
+                    ${r.deltas.map((d, i) => `<td style="color:${d > 0 ? '#2ecc71' : (d < 0 ? '#e74c3c' : '#aaa')}">${d > 0 ? `+${d}` : d}<br>(${r.scoresAfter[i]})</td>`).join('')}
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+  }
+  const hm = document.getElementById('history-modal');
+  if (hm) hm.style.display = 'flex';
+}
+
+function toggleAccordion(sIdx) {
+  const el = document.getElementById(`acc-item-${sIdx}`);
+  if (el) {
+    el.classList.toggle('open');
+    const arr = document.getElementById(`acc-arrow-${sIdx}`);
+    if (arr) arr.innerText = el.classList.contains('open') ? '▲' : '▼';
+  }
+}
+
+function closeScoreHistoryModal() {
+  const hm = document.getElementById('history-modal');
+  if (hm) hm.style.display = 'none';
+}
+
+function showResultModal(title, html) {
+  const rt = document.getElementById('result-title');
+  if (rt) rt.innerText = title;
+  const rd = document.getElementById('result-detail');
+  if (rd) rd.innerHTML = html;
+  const rm = document.getElementById('result-modal');
+  if (rm) rm.style.display = 'flex';
+  const mb = document.getElementById('minimized-restore-bar');
+  if (mb) mb.style.display = 'none';
+}
+
+function toggleMinimizeResult() {
+  const m = document.getElementById('result-modal');
+  const b = document.getElementById('minimized-restore-bar');
+  if (!m || !b) return;
+  if (m.style.display === 'none') {
+    m.style.display = 'flex'; b.style.display = 'none';
+  } else {
+    m.style.display = 'none'; b.style.display = 'block';
+  }
+}
+
+// 【重要】Next Round統合ハンドラ（オフライン・オンライン両対応）
+function requestNextRound() {
+  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
+    socket.emit('request_next_round', { roomId: currentRoomId });
+  } else {
+    nextRound();
+  }
+}
+
+function nextRound() {
+  stopConfetti();
+  hideOutcomeBanner();
+  const rm = document.getElementById('result-modal');
+  if (rm) rm.style.display = 'none';
+  const mb = document.getElementById('minimized-restore-bar');
+  if (mb) mb.style.display = 'none';
+
+  if (currentRound % 10 === 0) {
+    showChampionshipResult();
+  } else {
+    currentRound++;
+    startRound();
+  }
+}
+
+function showChampionshipResult() {
+  const sorted = [...players].sort((a, b) => b.score - a.score);
+  const champ = sorted[0];
+
+  let html = `<div style="text-align:center; font-size:14px; margin-bottom:10px;">
+    <b>🏆 WINNER: <span style="color:var(--gold); font-size:18px;">${champ.name}</span> (${champ.score} pt)</b>
+  </div><table class="history-table"><thead><tr><th>RANK</th><th>PLAYER</th><th>SCORE</th></tr></thead><tbody>`;
+
+  sorted.forEach((p, idx) => {
+    html += `<tr><td>${idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : idx + 1))}</td><td><b>${p.name}</b></td><td style="color:var(--gold); font-weight:bold;">${p.score} pt</td></tr>`;
+  });
+  html += '</tbody></table>';
+
+  const cr = document.getElementById('champ-rankings');
+  if (cr) cr.innerHTML = html;
+  const cm = document.getElementById('championship-modal');
+  if (cm) cm.style.display = 'flex';
+}
+
+function continueChampionship() {
+  const cm = document.getElementById('championship-modal');
+  if (cm) cm.style.display = 'none';
+  currentRound++;
+  startRound();
+}
+
+function resetChampionship() {
+  const cm = document.getElementById('championship-modal');
+  if (cm) cm.style.display = 'none';
+  players.forEach(p => { p.score = 0; p.bannedFromWin = false; });
+  currentRound = 1;
+  currentSet = getNextSessionNumber();
+  startRound();
+}

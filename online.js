@@ -1,12 +1,11 @@
 /**
  * DOBON MASTER - Online Network Module
- * Game Version: 2026.00.006
- * File Version: online.js v0.1.1
- * Updates: Animation-First Turn Transition Sync, Unified Next Round Broadcast,
- *          Lobby Search/Filter, Quick Match, Spectating, Vote Abort/Expand.
+ * Game Version: 2026.00.007
+ * File Version: online.js v0.1.2
+ * Updates: Next Round synchronization, 30s timeout auto-advance, player score sync and bilingual messages.
  */
 
-const ONLINE_MODULE_VERSION = "online.js v0.1.1";
+const ONLINE_MODULE_VERSION = "online.js v0.1.2";
 console.log(`[DOBON Online Module Loaded] Game: ${GAME_VERSION} | File: ${ONLINE_MODULE_VERSION}`);
 
 const SERVER_URL = 'https://dobon-server-cdpg.onrender.com';
@@ -41,7 +40,7 @@ window.addEventListener('DOMContentLoaded', () => {
         btn.style.borderColor = '#2ecc71';
         btn.style.color = '#2ecc71';
       }
-      setMessage('オンラインサーバー接続完了！');
+      setMessage(currentLang === 'ja' ? 'オンラインサーバー接続完了！' : 'Connected to online game server!');
     });
 
     socket.on('disconnect', () => {
@@ -127,16 +126,18 @@ window.addEventListener('DOMContentLoaded', () => {
       const vaModal = document.getElementById('vote-abort-modal');
       if (vaModal) vaModal.style.display = 'none';
       if (data.agreed) {
-        setMessage('【流し可決】全員一致によりノーゲームで合流しました！');
+        setMessage(currentLang === 'ja' ? '【流し可決】全員一致によりノーゲームで合流しました！' : '[Agreed] Round aborted by unanimous vote! Redealing...');
       } else {
-        setMessage('【流し否決】現在のラウンドを継続します。');
+        setMessage(currentLang === 'ja' ? '【流し否決】現在のラウンドを継続します。' : '[Rejected] Continuing current round.');
       }
     });
 
     socket.on('prompt_expand_table', (data) => {
       const desc = document.getElementById('vote-expand-desc');
       if (desc) {
-        desc.innerHTML = `定員を超えるプレイヤーが参加希望しています。<br>卓の定員を <b>${data.newCount}人卓</b> に拡張して許可しますか？<br><span style="font-size:10px; color:#ff7675;">※全会一致で拡張可決</span>`;
+        desc.innerHTML = (currentLang === 'ja')
+          ? `定員を超えるプレイヤーが参加希望しています。<br>卓の定員を <b>${data.newCount}人卓</b> に拡張して許可しますか？<br><span style="font-size:10px; color:#ff7675;">※全会一致で拡張可決</span>`
+          : `Players are waiting to join.<br>Expand table capacity to <b>${data.newCount} players</b>?<br><span style="font-size:10px; color:#ff7675;">※ Requires unanimous agreement</span>`;
       }
       const veModal = document.getElementById('vote-expand-modal');
       if (veModal) veModal.style.display = 'flex';
@@ -145,7 +146,7 @@ window.addEventListener('DOMContentLoaded', () => {
     socket.on('table_expanded_confirmed', (data) => {
       const veModal = document.getElementById('vote-expand-modal');
       if (veModal) veModal.style.display = 'none';
-      setMessage(`卓定員が ${data.newCapacity}人卓 に拡張されました！`);
+      setMessage(currentLang === 'ja' ? `卓定員が ${data.newCapacity}人卓 に拡張されました！` : `Table expanded to ${data.newCapacity} players!`);
     });
 
     socket.on('player_turned_cpu', (data) => {
@@ -153,7 +154,7 @@ window.addEventListener('DOMContentLoaded', () => {
         players[data.seatIndex].isCpu = true;
         players[data.seatIndex].name = data.newName;
         updateUI();
-        setMessage(`[通知] ${data.newName} に切り替わりました`);
+        setMessage(currentLang === 'ja' ? `[通知] ${data.newName} に切り替わりました` : `[Notice] Replaced with ${data.newName}`);
       }
     });
 
@@ -169,6 +170,19 @@ window.addEventListener('DOMContentLoaded', () => {
       if (rsModal) rsModal.style.display = 'none';
       const mrBar = document.getElementById('minimized-restore-bar');
       if (mrBar) mrBar.style.display = 'none';
+
+      stopNextRoundCountdown();
+      const rm = document.getElementById('result-modal');
+      if (rm) rm.style.display = 'none';
+      const mb = document.getElementById('minimized-restore-bar');
+      if (mb) mb.style.display = 'none';
+      const btn = document.getElementById('btn-next-round-main');
+      if (btn) {
+        btn.disabled = false;
+        btn.removeAttribute('data-ready');
+        btn.removeAttribute('data-ready-text');
+        btn.innerText = 'NEXT ROUND';
+      }
 
       isOnlineMatch = true;
       isGameOver = false;
@@ -209,7 +223,7 @@ window.addEventListener('DOMContentLoaded', () => {
           seatIndex: pData.seatIndex,
           name: (i === 0 && !isSpectator) ? 'YOU' : pData.name,
           hand: (i === 0 && !isSpectator) ? syncData.myHand : new Array(pData.cardCount).fill(null),
-          score: 0,
+          score: pData.score !== undefined ? pData.score : 0,
           bannedFromWin: false,
           declaredLast: false,
           isCpu: pData.isCpu,
@@ -229,12 +243,13 @@ window.addEventListener('DOMContentLoaded', () => {
       if (isSpectator) {
         setMessage(I18N[currentLang].spectatorWatching);
       } else if (turnIndex === 0) {
-        setMessage('【オンライン対戦】あなたの番です！カードを出してください');
+        setMessage(I18N[currentLang].onlineTurnYours || I18N[currentLang].yourTurn);
         startTimerWithDuration(userTimeLimit, handleUserTimeout);
       } else {
         const actingPlayer = players.find(p => p.seatIndex === currentOnlineTurnSeat);
-        const name = actingPlayer ? actingPlayer.name : '相手';
-        setMessage(`【オンライン対戦】${name} の手番です。操作を待っています...`);
+        const name = actingPlayer ? actingPlayer.name : (currentLang === 'ja' ? '相手' : 'Opponent');
+        const pattern = I18N[currentLang].onlineTurnOpponent || 'Waiting for {name}...';
+        setMessage(pattern.replace('{name}', name));
       }
     });
 
@@ -274,15 +289,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
       if (isSpectator) {
         const actingPlayer = players.find(p => p.seatIndex === currentOnlineTurnSeat);
-        const name = actingPlayer ? actingPlayer.name : 'プレイヤー';
-        setMessage(`【観戦中】${name} の手番です`);
+        const name = actingPlayer ? actingPlayer.name : (currentLang === 'ja' ? 'プレイヤー' : 'Player');
+        setMessage(currentLang === 'ja' ? `【観戦中】${name} の手番です` : `[Spectating] ${name}'s turn`);
       } else if (turnIndex === 0) {
         setMessage(I18N[currentLang].yourTurn);
         startTimerWithDuration(userTimeLimit, handleUserTimeout);
       } else {
         const actingPlayer = players.find(p => p.seatIndex === currentOnlineTurnSeat);
-        const name = actingPlayer ? actingPlayer.name : '相手';
-        setMessage(`${name} の手番です。操作を待っています...`);
+        const name = actingPlayer ? actingPlayer.name : (currentLang === 'ja' ? '相手' : 'Opponent');
+        setMessage(currentLang === 'ja' ? `${name} の手番です。操作を待っています...` : `Waiting for ${name}...`);
       }
     });
 
@@ -340,18 +355,38 @@ window.addEventListener('DOMContentLoaded', () => {
       hideDrawAlertBanner();
 
       const isMeWinner = (!isSpectator && data.winnerSeatIndex === myOnlineSeatIndex);
+
+      if (Array.isArray(data.playerScores)) {
+        data.playerScores.forEach(ps => {
+          const vIdx = getVisualSeatIndex(ps.seatIndex);
+          if (players[vIdx]) players[vIdx].score = ps.score;
+        });
+      }
+
       updateUI();
       if (!isSpectator) showOutcomeBanner(isMeWinner);
 
-      let detailHtml = `<b>${data.winnerName}</b> の【${data.winType}】！<br><br>`;
-      detailHtml += `勝者: <b>${data.winnerName} (+${data.points}pt)</b><br>`;
-      detailHtml += `放銃者: <b style="color:#e74c3c;">${data.loserName} (-${data.points}pt)</b><br>`;
-      if (data.loserHandCount) {
-        detailHtml += `(${data.loserName} 手札換算: ${data.loserHandCount}枚)<br>`;
-      }
-      detailHtml += `<br>※放銃者以外のプレイヤーは点数変動なし（0pt）`;
+      const winLbl = (currentLang === 'ja') ? 'の【' + data.winType + '】！' : ' WON with ' + data.winType + '!';
+      const winnerLbl = (currentLang === 'ja') ? '勝者: ' : 'Winner: ';
+      const payerLbl = (currentLang === 'ja') ? '放銃者: ' : 'Payer: ';
+      const cardsLeftLbl = (currentLang === 'ja') ? ' 手札換算: ' : ' Cards: ';
 
-      showResultModal(`${data.winnerName} DOBON WIN!`, detailHtml);
+      let detailHtml = `<b>${data.winnerName}</b> ${winLbl}<br>`;
+      detailHtml += `${winnerLbl}<b>${data.winnerName} (+${data.points}pt)</b><br>`;
+      detailHtml += `${payerLbl}<b style="color:#e74c3c;">${data.loserName} (-${data.points}pt)</b><br>`;
+      if (data.loserHandCount) {
+        detailHtml += `(${data.loserName}${cardsLeftLbl}${data.loserHandCount})<br>`;
+      }
+
+      const scoreData = {
+        playerScores: data.playerScores,
+        roomHistory: data.roomHistory,
+        currentRound: data.currentRound || currentRound,
+        winType: data.winType,
+        points: data.points
+      };
+
+      showResultModal(`${data.winnerName} DOBON WIN!`, detailHtml, scoreData);
     });
 
     socket.on('chombo_synced', (data) => {
@@ -366,10 +401,34 @@ window.addEventListener('DOMContentLoaded', () => {
       roundMultiplier = data.newMultiplier;
       const md = document.getElementById('multiplier-display');
       if (md) md.innerText = roundMultiplier + 'x';
+
+      if (Array.isArray(data.playerScores)) {
+        data.playerScores.forEach(ps => {
+          const vIdx = getVisualSeatIndex(ps.seatIndex);
+          if (players[vIdx]) players[vIdx].score = ps.score;
+        });
+      }
+
       updateUI();
 
       showChomboDoubleBanner(data.offenderName, roundMultiplier);
-      showResultModal('CHOMBO / FOUL', `<b>違反者: ${data.offenderName}</b><br>${data.reason}<br><br><span style="color:#ff6b81; font-weight:bold;">※勝者なし・全員に点数支払い ＆ 次回得点倍率は ${roundMultiplier}x に倍々累積！</span>`);
+
+      const offenderLbl = (currentLang === 'ja') ? '違反者: ' : 'Violator: ';
+      const bannerDesc = (currentLang === 'ja') 
+        ? '※勝者なし・全員に点数支払い ＆ 次回得点倍率は ' + roundMultiplier + 'x に倍々累積！' 
+        : 'Penalty paid to all players & next round multiplier ' + roundMultiplier + 'x doubled!';
+
+      const detailHtml = `<b>${offenderLbl}${data.offenderName}</b><br>${data.reason}<br><br><span style="color:#ff6b81; font-weight:bold;">${bannerDesc}</span>`;
+
+      const scoreData = {
+        playerScores: data.playerScores,
+        roomHistory: data.roomHistory,
+        currentRound: data.currentRound || currentRound,
+        winType: 'CHOMBO',
+        points: 0
+      };
+
+      showResultModal('CHOMBO / FOUL', detailHtml, scoreData);
     });
 
     socket.on('game_ended_sync', (endData) => {
@@ -382,18 +441,51 @@ window.addEventListener('DOMContentLoaded', () => {
       if (ds) ds.innerText = '0';
 
       const isIWinner = (!isSpectator && endData.winnerSeatIndex === myOnlineSeatIndex);
+
+      if (Array.isArray(endData.playerScores)) {
+        endData.playerScores.forEach(ps => {
+          const vIdx = getVisualSeatIndex(ps.seatIndex);
+          if (players[vIdx]) players[vIdx].score = ps.score;
+        });
+      }
+
       updateUI();
       if (!isSpectator) showOutcomeBanner(isIWinner);
 
-      let detailHtml = `<b>${endData.winnerName}</b> の【${endData.winningType}】！<br><br>`;
-      detailHtml += isIWinner ? '<span style="color:#2ecc71; font-weight:bold;">あなたの勝利です！</span>' : '<span style="color:#e74c3c;">相手の勝利です。</span>';
-      showResultModal(`${endData.winnerName} WIN!`, detailHtml);
+      const winLbl = (currentLang === 'ja') ? 'の【' + endData.winningType + '】！' : ' WON with ' + endData.winningType + '!';
+      let detailHtml = `<b>${endData.winnerName}</b> ${winLbl}<br>`;
+      detailHtml += isIWinner 
+        ? `<span style="color:#2ecc71; font-weight:bold;">${currentLang === 'ja' ? 'あなたの勝利です！' : 'You won this round!'}</span>` 
+        : `<span style="color:#e74c3c;">${currentLang === 'ja' ? '相手の勝利です。' : endData.winnerName + ' won this round.'}</span>`;
+
+      const scoreData = {
+        playerScores: endData.playerScores,
+        roomHistory: endData.roomHistory,
+        currentRound: endData.currentRound || currentRound,
+        winType: endData.winningType,
+        points: endData.points || 0
+      };
+
+      showResultModal(`${endData.winnerName} WIN!`, detailHtml, scoreData);
+    });
+
+    socket.on('next_round_status', (data) => {
+      const btn = document.getElementById('btn-next-round-main');
+      if (btn && btn.getAttribute('data-ready') === 'true') {
+        const readyTxt = (currentLang === 'ja') 
+          ? `待機中 (${data.readyCount}/${data.totalCount})` 
+          : `READY (${data.readyCount}/${data.totalCount})`;
+        btn.setAttribute('data-ready-text', readyTxt);
+        updateNextRoundButtonLabel();
+      }
     });
 
     socket.on('player_disconnected_prompt', (data) => {
       disconnectingSeatIndex = data.leftSeatIndex;
       const desc = document.getElementById('player-left-desc');
-      if (desc) desc.innerText = `プレイヤー「${data.leftPlayerName}」が退室しました。\nゲームの続行方法を選択してください。`;
+      if (desc) desc.innerText = (currentLang === 'ja')
+        ? `プレイヤー「${data.leftPlayerName}」が退室しました。\nゲームの続行方法を選択してください。`
+        : `Player "${data.leftPlayerName}" has left.\nPlease choose how to proceed.`;
       const plModal = document.getElementById('player-left-modal');
       if (plModal) plModal.style.display = 'flex';
     });

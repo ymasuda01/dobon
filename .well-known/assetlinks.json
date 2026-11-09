@@ -2,7 +2,7 @@
       "relation": ["delegate_permission/common.handle_all_urls"],
       "target": {
         "namespace": "android_app",
-        "package_name": "io.github.ymasuda01.twa",
-        "sha256_cert_fingerprints": ["AF:8F:8E:EA:6C:B6:D7:5E:85:19:6A:4C:2D:79:0F:05:88:70:EA:35:50:6E:E1:CB:CC:F8:99:15:75:05:9E:09"]
+        "package_name": "io.github.ymasuda01.dobon",
+        "sha256_cert_fingerprints": ["0A:85:28:DD:52:C4:7E:66:66:02:86:62:13:16:1F:F9:BE:87:82:2C:9D:54:43:E3:5F:5D:4C:C9:FB:BD:90:DC"]
       }
     }]

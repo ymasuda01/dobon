@@ -1,12 +1,12 @@
 /**
  * DOBON MASTER - Core Game Engine
  * Game Version: 2026.00.007
- * File Version: game.js v0.2.2
- * Updates: Bilingual UI, side-by-side round score board, match history, and 30s next round auto-advance.
+ * File Version: game.js v0.2.3
+ * Updates: Pon turn progression fix, initial 9 reversal, flexible LAST window, late Chombo on finish, penalty cleanup.
  */
 
 const GAME_VERSION = "2026.00.007";
-const FILE_VERSION = "game.js v0.2.2";
+const FILE_VERSION = "game.js v0.2.3";
 console.log(`[DOBON Core Loaded] Game: ${GAME_VERSION} | File: ${FILE_VERSION}`);
 
 const I18N = {
@@ -18,7 +18,7 @@ const I18N = {
     skipByOpponent: '相手のAでスキップされました！相手の手番が続きます...',
     dirCCW: '反時計回り', dirCW: '時計回り', chooseSuit: '指定マークを選択',
     chomboWrongLast: '手札が3枚以上あるのに「LAST」状態でカードを出しました（チョンボ）',
-    chomboMissLast: '「LAST」未宣言のまま次の手番に進んだか、上がろうとしました（チョンボ）',
+    chomboMissLast: '「LAST」未宣言のまま上がろうとしました（チョンボ）',
     chomboSingleCardDobon: '手札1枚でのドボンは禁止されています（手札1枚ドボンチョンボ）',
     timeoutMsg: '制限時間以内に行動しませんでした（時間切れチョンボ）',
     skipChomboPrompt: '上がり禁止ペナルティを解除しました (-10pt)',
@@ -27,7 +27,7 @@ const I18N = {
     suitChanged: 'マークを {suit} に指定しました',
     drewCards: '累積 {count}枚 を引きました', drewOne: '山札から1枚引きました',
     lastCanceled: '山札を引いたため、ラスト宣言が解除されました',
-    lastStandby: '「LAST」スタンバイ中', lastReset: '「LAST」を解除しました',
+    lastStandby: '「LAST」宣言しました！', lastReset: '「LAST」を解除しました',
     ponKanSelect: 'カードを選んでCONFIRMを押してください',
     onlineTurnYours: '【オンライン対戦】あなたの番です！カードを出してください',
     onlineTurnOpponent: '【オンライン対戦】{name} の手番です。操作を待っています...',
@@ -60,7 +60,7 @@ const I18N = {
     skipByOpponent: 'Skipped by opponent! Their turn continues...',
     dirCCW: 'Counter-Clockwise', dirCW: 'Clockwise', chooseSuit: 'SELECT SUIT',
     chomboWrongLast: 'Played while LAST was active with 3 or more cards (Chombo)',
-    chomboMissLast: 'Failed to declare LAST before proceeding or finishing (Chombo)',
+    chomboMissLast: 'Failed to declare LAST before finishing (Chombo)',
     chomboSingleCardDobon: 'Dobon with only 1 card left is strictly prohibited (Chombo)',
     timeoutMsg: 'Did not play within time limit (Timeout Chombo)',
     skipChomboPrompt: 'Lifted win-ban penalty (-10pt applied)',
@@ -69,7 +69,7 @@ const I18N = {
     suitChanged: 'Suit changed to {suit}',
     drewCards: 'Drew {count} stacked cards', drewOne: 'Drew 1 card from deck',
     lastCanceled: 'Drew from deck: LAST declaration reset',
-    lastStandby: 'LAST armed', lastReset: 'LAST canceled',
+    lastStandby: 'LAST declared!', lastReset: 'LAST canceled',
     ponKanSelect: 'Select cards and press CONFIRM',
     onlineTurnYours: '[Online Match] Your turn! Play a card or draw',
     onlineTurnOpponent: '[Online Match] Waiting for {name}...',
@@ -121,7 +121,9 @@ let roundMultiplier = 1, drawTwoStack = 0, designatedSuit = null;
 let isGameOver = false, turnTimer = null, remainingTime = 0;
 let setScoreHistory = [];
 let activeNakiType = null, selectedIndices = [], nextRoundStarter = 0;
-let pendingLastCheck = false, userLastWarningCount = 0;
+
+// ラスト宣言制御（次の人が出す直前まで押せる）
+let canUserDeclareLast = false;
 
 // ドボン返し猶予
 let dobonStandbyTimer = null, dobonStandbySec = 10, pendingDobonData = null;
@@ -469,9 +471,10 @@ function startRound() {
   isGameOver = false; stopTimer(); clearDobonStandby(); stopConfetti();
   hideOutcomeBanner();
   createDeck52(); discardHistory = []; drawTwoStack = 0; designatedSuit = null;
+  
   // ルールブック準拠：初期方向は反時計回り（-1）
   direction = -1;
-  selectedIndices = []; cancelNakiMode(); pendingLastCheck = false;
+  selectedIndices = []; cancelNakiMode();
   consecutivePassCount = 0;
   hideDrawAlertBanner();
 
@@ -521,10 +524,19 @@ function startRound() {
   discardHistory.push(initCard);
   lastActionDiscard = { cards: [initCard], totalVal: initCard.val, playerId: -1 };
 
+  // ★初めから9が出ているときは、最初から逆回り（時計回り 1）に反転★
+  if (initCard.val === 9) {
+    direction = 1;
+    setMessage('Initial 9: Direction Reversed (Clockwise)');
+  }
+
   // 勝者（またはCPU勝者）から手番スタート
   turnIndex = (nextRoundStarter !== undefined) ? (nextRoundStarter % numPlayers) : 0;
-  updateUI();
+  
+  // ラスト宣言受付ウィンドウ初期化
+  canUserDeclareLast = (turnIndex === 0 && players[0].hand.length <= 2);
 
+  updateUI();
   checkTenho();
 
   if (turnIndex === 0) {
@@ -534,11 +546,21 @@ function startRound() {
   }
 }
 
+// 全員の上がり禁止ペナルティをクリア
+function clearAllWinBans() {
+  players.forEach(p => { p.bannedFromWin = false; });
+  const skBtn = document.getElementById('skip-chombo-btn');
+  if (skBtn) skBtn.style.display = 'none';
+}
+
 function skipChomboRound() {
   if (!players[0] || !players[0].bannedFromWin) return;
   players[0].score -= 10;
   players[0].bannedFromWin = false;
+  const skBtn = document.getElementById('skip-chombo-btn');
+  if (skBtn) skBtn.style.display = 'none';
   alert(I18N[currentLang].skipChomboPrompt);
+  // 倍倍(roundMultiplier)はそのまま維持して次局へ進む
   nextRound();
 }
 
@@ -736,17 +758,18 @@ function updateUI() {
     }
   }
 
+  // ★LASTボタン制御：他人が操作している間は押せないように非活性化★
   const lastBtn = document.getElementById('last-btn');
   if (lastBtn) {
     if (isSpec) {
       lastBtn.style.display = 'none';
     } else {
       lastBtn.style.display = 'block';
-      if (pendingLastCheck && user && !user.declaredLast) {
-        lastBtn.classList.add('urgent');
-      } else {
-        lastBtn.classList.remove('urgent');
-      }
+      const isAllowed = canUserDeclareLast && user && user.hand.length <= 2;
+      lastBtn.disabled = !isAllowed;
+      lastBtn.style.opacity = isAllowed ? '1' : '0.45';
+      lastBtn.style.pointerEvents = isAllowed ? 'auto' : 'none';
+      lastBtn.classList.toggle('active', !!(user && user.declaredLast));
     }
   }
 
@@ -806,6 +829,12 @@ function setMessage(msg) {
 // 打牌・ドロー演出
 // ==========================================
 function playCardWithHandAnimation(playerId, card, callback) {
+  // 誰かがカードを出した瞬間、前手番プレイヤーのラスト宣言受付猶予は終了
+  if (playerId !== 0) {
+    canUserDeclareLast = false;
+    updateUI();
+  }
+
   const unit = document.getElementById('flying-play-unit');
   const cardSlot = document.getElementById('flying-card-slot');
   const handImg = document.getElementById('flying-hand-img');
@@ -924,19 +953,7 @@ function playUserCard(index) {
     return;
   }
 
-  if (players[0].hand.length === 2 && !players[0].declaredLast && !pendingLastCheck) {
-    if (userLastWarningCount === 0) {
-      userLastWarningCount++;
-      alert('【警告】ラスト宣言を忘れています！先にLASTを押してから出してください（1回目は免除）');
-      selectedIndices = [];
-      updateUI();
-      return;
-    } else {
-      commitChombo(players[0], I18N[currentLang].chomboMissLast);
-      return;
-    }
-  }
-
+  // ★重要：ラスト未宣言のまま「最後の1枚」を出して上がろうとした瞬間にチョンボ判定★
   if (players[0].hand.length === 1 && !players[0].declaredLast) {
     commitChombo(players[0], I18N[currentLang].chomboMissLast);
     return;
@@ -960,15 +977,13 @@ function playUserCard(index) {
     stopTimer();
     consecutivePassCount = 0;
 
+    // カードを出して手札が1枚になる場合、次の人がカードを出す直前までラスト宣言が可能
     if (players[0].hand.length === 2) {
-      if (players[0].declaredLast) {
-        speakVoice(currentLang === 'ja' ? 'ラスト！' : 'Last!');
-      } else {
-        pendingLastCheck = true;
-      }
+      canUserDeclareLast = true;
+    } else {
+      canUserDeclareLast = false;
     }
 
-    // ★アニメーション完了後に手番移行・送信を行う★
     playCardWithHandAnimation(0, card, () => {
       players[0].hand.splice(index, 1);
       discardHistory.push(card);
@@ -1063,6 +1078,12 @@ function passTurn(skips = 0) {
   stopTimer();
   turnIndex = (turnIndex + (1 + skips) * direction) % numPlayers;
   while (turnIndex < 0) turnIndex += numPlayers;
+
+  // 手番が自分に戻った際、手札が2枚以下ならLAST宣言を許可
+  if (turnIndex === 0 && players[0].hand.length <= 2) {
+    canUserDeclareLast = true;
+  }
+
   updateUI();
 
   if (turnIndex === 0) {
@@ -1073,7 +1094,7 @@ function passTurn(skips = 0) {
       setMessage(`${players[turnIndex].name} ${I18N[currentLang].opponentThinking}`);
     } else {
       setMessage(`${players[turnIndex].name} ${I18N[currentLang].cpuThinking}`);
-      const delay = pendingLastCheck ? 5200 : Math.floor(Math.random() * (4000 - 1500 + 1)) + 1500;
+      const delay = Math.floor(Math.random() * (3500 - 1500 + 1)) + 1500;
       setTimeout(cpuTurn, delay);
     }
   }
@@ -1081,21 +1102,23 @@ function passTurn(skips = 0) {
 
 function scheduleCpuTurn() {
   if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch) return;
-  const delay = Math.floor(Math.random() * (4000 - 1500 + 1)) + 1500;
+  const delay = Math.floor(Math.random() * (3500 - 1500 + 1)) + 1500;
   setTimeout(cpuTurn, delay);
 }
 
+// 山札を引く（未宣言で手札1枚になっていても山札を引けばセーフ！）
 function onDeckClick() {
   if (turnIndex !== 0 || isGameOver || pendingDobonData || (typeof isSpectator !== 'undefined' && isSpectator)) return;
   stopTimer();
 
+  // カードを引いたので手札が増加。ラスト状態は解除される
   if (players[0].declaredLast) {
     players[0].declaredLast = false;
     const lBtn = document.getElementById('last-btn');
-    if (lBtn) lBtn.classList.remove('active', 'urgent');
+    if (lBtn) lBtn.classList.remove('active');
     setMessage(I18N[currentLang].lastCanceled);
   }
-  pendingLastCheck = false;
+  canUserDeclareLast = false;
 
   playDrawAnimation(0, () => {
     if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
@@ -1145,22 +1168,17 @@ function checkNagare() {
   }
 }
 
+// ラストボタン押下処理
 function toggleUserLast() {
+  if (!canUserDeclareLast) return;
+
   players[0].declaredLast = !players[0].declaredLast;
   const btn = document.getElementById('last-btn');
-  if (btn) {
-    btn.classList.toggle('active', players[0].declaredLast);
-    btn.classList.remove('urgent');
-  }
+  if (btn) btn.classList.toggle('active', players[0].declaredLast);
 
   if (players[0].declaredLast) {
-    if (pendingLastCheck) {
-      pendingLastCheck = false;
-      speakVoice(currentLang === 'ja' ? 'ラスト！' : 'Last!');
-      setMessage('「LAST」宣言が成立しました！');
-    } else {
-      setMessage(I18N[currentLang].lastStandby);
-    }
+    speakVoice(currentLang === 'ja' ? 'ラスト！' : 'Last!');
+    setMessage(I18N[currentLang].lastStandby);
   } else {
     setMessage(I18N[currentLang].lastReset);
   }
@@ -1210,6 +1228,7 @@ function cancelNakiMode() {
   else stopTimer();
 }
 
+// ポン・カンの確定処理（★ポンした次の人の番へ確実に移行★）
 function confirmNaki() {
   if (!activeNakiType) return;
   const req = activeNakiType;
@@ -1249,8 +1268,9 @@ function confirmNaki() {
     isPon: isPon, isKan: isKan, baseVal: val
   };
 
-  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
-    socket.emit('resume_from_naki', { roomId: currentRoomId });
+  // 手札が1枚になった場合はLAST受付を許可（次の人がカードを出す直前まで）
+  if (players[0].hand.length === 1) {
+    canUserDeclareLast = true;
   }
 
   if (players[0].hand.length === 0) {
@@ -1259,14 +1279,27 @@ function confirmNaki() {
     return;
   }
 
-  if (turnIndex === 0) speakVoice(req === 2 ? (currentLang === 'ja' ? 'ポン！' : 'Pon!') : (currentLang === 'ja' ? 'カン！' : 'Kan!'));
-
+  speakVoice(req === 2 ? (currentLang === 'ja' ? 'ポン！' : 'Pon!') : (currentLang === 'ja' ? 'カン！' : 'Kan!'));
   cancelNakiMode();
+
+  // オンライン対戦時はサーバーへ鳴き結果と手番遷移を通知
+  if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
+    socket.emit('confirm_naki_sync', {
+      roomId: currentRoomId,
+      actorSeatIndex: 0,
+      cards: cards,
+      remainingCardCount: players[0].hand.length
+    });
+    return;
+  }
+
+  // オフライン戦：ポンしたプレイヤーの次のプレイヤーへ手番を移行
   handlePonKanEffects(cards, players[0]);
 }
 
 function executePonDobonWin(winner, discardCard, isKan, baseVal) {
   isGameOver = true; stopTimer(); clearDobonStandby(); hideDrawAlertBanner();
+  clearAllWinBans(); // 上がりによりペナルティ全面解除
 
   const loserId = lastActionDiscard && lastActionDiscard.playerId !== -1 ? lastActionDiscard.playerId : (winner.id - direction + numPlayers) % numPlayers;
   const loser = players[loserId];
@@ -1325,7 +1358,8 @@ function handlePonKanEffects(cards, player) {
   if (val === 1) skips = isKan ? 3 : 2;
   if (val === 9 && isKan) direction *= -1;
 
-  turnIndex = player.id; updateUI();
+  // ポンした人の手番を起点とし、次の人へ進める
+  turnIndex = player.id;
   if (typeof isOnlineMatch === 'undefined' || !isOnlineMatch) {
     if (checkCpuInterrupts(lastActionDiscard.totalVal, player.id)) return;
   }
@@ -1421,6 +1455,7 @@ function clearDobonStandby() {
 function finalizeNormalDobon(winner, loser, actionDiscard) {
   isGameOver = true;
   hideDrawAlertBanner();
+  clearAllWinBans(); // 上がりによりペナルティ全面解除
 
   if (actionDiscard.cards) {
     actionDiscard.cards.forEach(c => loser.hand.push(c));
@@ -1466,6 +1501,7 @@ function finalizeNormalDobon(winner, loser, actionDiscard) {
 function executeDobonGaeshiWin(winner, loser) {
   isGameOver = true;
   hideDrawAlertBanner();
+  clearAllWinBans(); // 上がりによりペナルティ全面解除
   const points = 20 * roundMultiplier;
 
   const deltas = players.map(p => (p.id === winner.id ? points : (p.id === loser.id ? -points : 0)));
@@ -1507,6 +1543,8 @@ function calculateSpecialHandCount(hand) {
 
 function endRoundNormalWin(winner) {
   isGameOver = true; stopTimer(); clearDobonStandby(); hideDrawAlertBanner();
+  clearAllWinBans(); // 上がりによりペナルティ全面解除
+
   let totalWin = 0;
   const deltas = new Array(players.length).fill(0);
   let detailHtml = `<b>${winner.name} NORMAL WIN!</b><br><br>`;
@@ -1577,6 +1615,7 @@ function checkTenho() {
     if (p.bannedFromWin) continue;
     if (p.hand.reduce((s, c) => s + (c ? c.val : 0), 0) === targetVal) {
       isGameOver = true; stopTimer(); hideDrawAlertBanner();
+      clearAllWinBans(); // 上がりによりペナルティ全面解除
       const pts = 20 * roundMultiplier;
       const deltas = new Array(players.length).fill(0);
       players.forEach(o => {
@@ -1598,13 +1637,6 @@ function cpuTurn() {
   if (isGameOver || turnIndex === 0 || pendingDobonData || (typeof isOnlineMatch !== 'undefined' && isOnlineMatch)) return;
   const cpu = players[turnIndex];
   const top = discardHistory[discardHistory.length - 1];
-
-  if (pendingLastCheck && !players[0].declaredLast) {
-    pendingLastCheck = false;
-    commitChombo(players[0], I18N[currentLang].chomboMissLast);
-    return;
-  }
-  pendingLastCheck = false;
 
   if (cpu.hand.length <= 2 && !cpu.declaredLast) cpu.declaredLast = true;
 
@@ -1974,7 +2006,6 @@ function toggleMinimizeResult() {
   }
 }
 
-// 【重要】Next Round統合ハンドラ（オフライン・オンライン両対応）
 function requestNextRound() {
   if (typeof isOnlineMatch !== 'undefined' && isOnlineMatch && typeof socket !== 'undefined' && socket && currentRoomId) {
     const btn = document.getElementById('btn-next-round-main');
